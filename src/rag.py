@@ -8,7 +8,7 @@ from pptx import Presentation
 from PIL import Image
 import pytesseract
 from pdf2image import convert_from_bytes
-
+import openpyxl
 import chromadb
 from chromadb.utils import embedding_functions
 
@@ -35,6 +35,7 @@ collection = client.get_or_create_collection(
 # Helpers
 # -----------------------
 def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
+    """Metni belirli uzunluklarda chunklara ayırır."""
     chunks = []
     start = 0
     while start < len(text):
@@ -47,6 +48,7 @@ def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) 
 # Dosya Parsing
 # -----------------------
 def extract_text_from_file(filename: str, raw: bytes) -> str:
+    """PDF, Word, PPTX, Excel, JSON, TXT vb. dosyalardan metin çıkarır."""
     text = ""
     mime_type, _ = mimetypes.guess_type(filename)
 
@@ -80,6 +82,15 @@ def extract_text_from_file(filename: str, raw: bytes) -> str:
                         image = Image.open(io.BytesIO(shape.image.blob))
                         text += pytesseract.image_to_string(image, lang="tur") + "\n"
 
+        elif mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" or filename.endswith(".xls"):
+            wb = openpyxl.load_workbook(io.BytesIO(raw), data_only=True)
+            for sheet in wb.worksheets:
+                text += f"\n# {sheet.title}\n"
+                for row in sheet.iter_rows(values_only=True):
+                    row_text = " ".join([str(cell) for cell in row if cell is not None])
+                    if row_text.strip():
+                        text += row_text + "\n"            
+
         elif filename.endswith(".json"):
             data = json.loads(raw.decode("utf-8", errors="ignore"))
             if isinstance(data, dict) and "items" in data:
@@ -105,23 +116,26 @@ def extract_text_from_file(filename: str, raw: bytes) -> str:
 # -----------------------
 # Indexleme
 # -----------------------
-def index_doc(filename: str, text: str) -> int:
+def index_doc(filename: str, text: str, topic: str = "other") -> int:
+    """Metni chunklara bölerek Chroma koleksiyonuna ekler."""
     chunks = chunk_text(text)
     for i, chunk in enumerate(chunks):
         collection.add(
             ids=[f"{filename}_{i}"],
             documents=[chunk],
-            metadatas=[{"doc_id": filename, "chunk": i}]
+            metadatas=[{"doc_id": filename, "chunk": i, "topic": topic}]
         )
     return len(chunks)
 
 # -----------------------
 # Arama
 # -----------------------
-def search(query: str, top_k: int = 5):
+def search(query: str, top_k: int = 5, where: dict = None):
+    """Sorgu ile Chroma koleksiyonunda arama yapar."""
     results = collection.query(
         query_texts=[query],
-        n_results=top_k
+        n_results=top_k,
+        where=where
     )
     return results
 
@@ -138,7 +152,6 @@ def delete_doc(doc_id: str):
 def delete_all():
     try:
         client.delete_collection("knowledge_bot")
-        # koleksiyonu yeniden oluştur
         global collection
         collection = client.get_or_create_collection(
             name="knowledge_bot",
