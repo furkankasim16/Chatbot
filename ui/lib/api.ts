@@ -4,7 +4,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export interface Question {
   id?: string
-  type: "mcq" | "true_false" | "short_answer" | "scenario"
+  type: "mcq" | "true_false" | "short_answer" | "scenario" | "open_ended" | "short" | "senaryo" | "open"
   topic: string
   level: string
   stem: string
@@ -29,6 +29,35 @@ export interface QuizResponse {
 
 export interface TopicsResponse {
   topics: Record<string, number>
+}
+
+export interface LoginResponse {
+  access_token: string
+  token_type: string
+  username: string
+}
+
+export interface RegisterRequest {
+  username: string
+  email: string
+  password: string
+}
+
+export interface UserStats {
+  total_quizzes: number
+  total_questions: number
+  correct_answers: number
+  last_quiz_date: string | null
+  topic_stats: Record<string, { correct: number; total: number }>
+}
+
+export interface QuizResult {
+  quiz_id?: string
+  topic: string
+  difficulty: string
+  total_questions: number
+  correct_answers: number
+  completed_at: string
 }
 
 const MOCK_QUESTIONS: Question[] = [
@@ -123,17 +152,27 @@ export async function generateQuiz(topic: string, level = "beginner", n = 5): Pr
     `${API_BASE_URL}/quiz?topic=${encodeURIComponent(topic)}&level=${level}&n=${n}`,
   )
 
-  const res = await fetch(`${API_BASE_URL}/quiz?topic=${encodeURIComponent(topic)}&level=${level}&n=${n}`, {
-    method: "POST",
-  })
+  const controller = new AbortController()
 
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => "Unknown error")
-    console.error("[v0] API Error:", errorText)
-    throw new Error(`Failed to generate quiz: ${res.status} ${res.statusText}`)
+  try {
+    const res = await fetch(`${API_BASE_URL}/quiz?topic=${encodeURIComponent(topic)}&level=${level}&n=${n}`, {
+      method: "POST",
+      signal: controller.signal,
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "Unknown error")
+      console.error("[v0] API Error:", errorText)
+      throw new Error(`Failed to generate quiz: ${res.status} ${res.statusText}`)
+    }
+
+    return res.json()
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Soru üretimi iptal edildi.")
+    }
+    throw error
   }
-
-  return res.json()
 }
 
 // Get random question (for Daily Question)
@@ -184,6 +223,7 @@ export async function searchDocuments(query: string) {
   return res.json()
 }
 
+// Get questions from DB
 export async function getQuestionsFromDB(topic: string, level: string, count: number): Promise<Question[]> {
   if (USE_MOCK_DATA) {
     console.log("[v0] Using mock data for questions")
@@ -208,5 +248,144 @@ export async function getQuestionsFromDB(topic: string, level: string, count: nu
   } catch (error) {
     console.error("[v0] Error fetching questions from DB:", error)
     throw error
+  }
+}
+
+// Login
+export async function login(username: string, password: string): Promise<LoginResponse> {
+  const formData = new FormData()
+  formData.append("username", username)
+  formData.append("password", password)
+
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: "POST",
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Giriş başarısız" }))
+    throw new Error(error.detail || "Kullanıcı adı veya şifre hatalı")
+  }
+
+  return res.json()
+}
+
+// Register
+export async function register(username: string, email: string, password: string): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, password }),
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Kayıt başarısız" }))
+    throw new Error(error.detail || "Bu kullanıcı adı veya e-posta zaten kullanılıyor")
+  }
+
+  return res.json()
+}
+
+// Get user stats
+export async function getUserStats(token: string): Promise<UserStats> {
+  const res = await fetch(`${API_BASE_URL}/auth/stats`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error("İstatistikler yüklenemedi")
+  }
+
+  return res.json()
+}
+
+// Submit quiz result
+export async function submitQuizResult(token: string, result: QuizResult): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/auth/submit-result`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(result),
+  })
+
+  if (!res.ok) {
+    throw new Error("Sonuç kaydedilemedi")
+  }
+}
+
+// Generate random question (Admin only)
+export async function generateRandomQuestion(token: string): Promise<Question> {
+  const res = await fetch(`${API_BASE_URL}/admin/generate-random-question`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Soru üretilemedi" }))
+    throw new Error(error.detail || "Soru üretilemedi")
+  }
+
+  return res.json()
+}
+
+// Generate question with parameters (Admin only)
+export async function generateQuestionWithParams(
+  token: string,
+  topic: string,
+  level: string,
+  qtype: string,
+): Promise<Question> {
+  const res = await fetch(
+    `${API_BASE_URL}/admin/generate-question?topic=${encodeURIComponent(topic)}&level=${level}&qtype=${qtype}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  )
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Soru üretilemedi" }))
+    throw new Error(error.detail || "Soru üretilemedi")
+  }
+
+  return res.json()
+}
+
+// Delete question (Admin only)
+export async function deleteQuestion(token: string, questionId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/admin/questions/${questionId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Soru silinemedi" }))
+    throw new Error(error.detail || "Soru silinemedi")
+  }
+}
+
+// Create first admin user (No auth required, only works if no admin exists)
+export async function createFirstAdmin(username: string, email: string, password: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/admin/create-first-admin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ username, email, password }),
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "İlk admin oluşturulamadı" }))
+    throw new Error(error.detail || "İlk admin oluşturulamadı")
   }
 }

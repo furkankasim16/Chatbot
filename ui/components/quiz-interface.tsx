@@ -21,8 +21,7 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
   const [scenarioAnswers, setScenarioAnswers] = useState<Record<number, string>>({})
   const [currentStep, setCurrentStep] = useState(1)
 
-  console.log("[v0] QuizInterface - Question type:", question.type)
-  console.log("[v0] QuizInterface - Full question:", question)
+  console.log("[QuizInterface] Rendering question type:", question.type)
 
   const progress = (questionNumber / totalQuestions) * 100
 
@@ -52,6 +51,7 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
 
   return (
     <div className="animate-fade-in space-y-6">
+      {/* Progress bar */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
@@ -65,19 +65,23 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
       <Card className="p-8 space-y-6">
         {question.type !== "scenario" ? (
           <>
+            {/* Question header */}
             <div className="space-y-3">
               <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
                 {question.type === "mcq"
                   ? "Multiple Choice"
                   : question.type === "true_false"
-                    ? "True/False"
-                    : "Short Answer"}
+                  ? "True/False"
+                  : question.type === "open_ended"
+                  ? "Open Ended"
+                  : "Short Answer"}
               </div>
               <h2 className="text-2xl font-semibold text-card-foreground text-balance leading-relaxed">
                 {question.stem}
               </h2>
             </div>
 
+            {/* MCQ */}
             {question.type === "mcq" && question.options && (
               <RadioGroup value={answer} onValueChange={setAnswer} className="space-y-3">
                 {question.options.map((option, index) => (
@@ -95,6 +99,7 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
               </RadioGroup>
             )}
 
+            {/* True/False */}
             {question.type === "true_false" && (
               <RadioGroup value={answer} onValueChange={setAnswer} className="space-y-3">
                 {["true", "false"].map((option) => (
@@ -112,9 +117,9 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
               </RadioGroup>
             )}
 
-            {question.type === "short_answer" && (
+            {/* Short Answer & Open Ended */}
+            {(question.type === "short_answer" || question.type === "open_ended") && (
               <div className="space-y-2">
-                {console.log("[v0] Rendering short_answer textarea")}
                 <Label htmlFor="answer" className="text-sm font-medium">
                   Your Answer
                 </Label>
@@ -123,13 +128,18 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
                   placeholder="Type your answer here..."
-                  className="min-h-24 text-base leading-relaxed"
+                  className={
+                    question.type === "open_ended"
+                      ? "min-h-40 text-base leading-relaxed"
+                      : "min-h-24 text-base leading-relaxed"
+                  }
                 />
               </div>
             )}
           </>
         ) : (
           <>
+            {/* Scenario mode */}
             <div className="space-y-3">
               <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
                 Scenario - Step {currentStep} of {question.steps?.length || 1}
@@ -155,7 +165,12 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
                   <Textarea
                     id="scenario-answer"
                     value={scenarioAnswers[currentStep] || ""}
-                    onChange={(e) => setScenarioAnswers((prev) => ({ ...prev, [currentStep]: e.target.value }))}
+                    onChange={(e) =>
+                      setScenarioAnswers((prev) => ({
+                        ...prev,
+                        [currentStep]: e.target.value,
+                      }))
+                    }
                     placeholder="Describe your approach..."
                     className="min-h-32 text-base leading-relaxed"
                   />
@@ -165,13 +180,16 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
           </>
         )}
 
+        {/* Submit / Next button */}
         <Button
           onClick={question.type === "scenario" ? handleScenarioNext : handleSubmit}
           disabled={!isAnswerValid()}
           className="w-full h-12 text-base font-medium"
           size="lg"
         >
-          {question.type === "scenario" && currentStep < (question.steps?.length || 1) ? "Next Step" : "Submit Answer"}
+          {question.type === "scenario" && currentStep < (question.steps?.length || 1)
+            ? "Next Step"
+            : "Submit Answer"}
         </Button>
       </Card>
     </div>

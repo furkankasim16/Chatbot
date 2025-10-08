@@ -3,11 +3,11 @@ import random
 import time
 from src import question
 
-def main(total: int = 150, mistral_ratio: float = 0.7):
+def main(total: int = 150, mistral_ratio: float = 0.5):
     question.init_db()
 
     # hangi modelleri kullanacağız
-    models = ["mistral", "gpt-oss:20b"]
+    models = ["mistral", "llama3:instruct"]
 
     generated = 0
     while generated < total:
@@ -23,7 +23,7 @@ def main(total: int = 150, mistral_ratio: float = 0.7):
 
         # soru üret
         q = question.generate_question_from_context(topic, level, qtype, model=model)
-
+        ""
         if "error" not in q:
             print(f"✅ Soru eklendi: {q.get('stem')[:60]}...")
             generated += 1
@@ -35,8 +35,8 @@ def main(total: int = 150, mistral_ratio: float = 0.7):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--total", type=int, default=150, help="Kaç soru üretilecek")
-    parser.add_argument("--ratio", type=float, default=0.7, help="Mistral oranı (0–1 arası)")
+    parser.add_argument("--total", type=int, default=30, help="Kaç soru üretilecek")
+    parser.add_argument("--ratio", type=float, default=0.5, help="Mistral oranı (0–1 arası)")
     args = parser.parse_args()
 
     main(total=args.total, mistral_ratio=args.ratio)

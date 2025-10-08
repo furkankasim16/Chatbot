@@ -4,7 +4,9 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Zap, Calendar, GitBranch, Clock, Loader2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { Zap, Calendar, GitBranch, Clock, Loader2, Sparkles } from "lucide-react"
 import type { QuizMode, Difficulty, QuizConfig } from "@/app/page"
 import { getTopics } from "@/lib/api"
 import useSWR from "swr"
@@ -19,6 +21,7 @@ export function HomeScreen({ onStartQuiz }: HomeScreenProps) {
   const [difficulty, setDifficulty] = useState<Difficulty>("beginner")
   const [isDailyAvailable, setIsDailyAvailable] = useState(true)
   const [nextDailyTime, setNextDailyTime] = useState<string>("")
+  const [useOllama, setUseOllama] = useState(false)
 
   const {
     data: topicsData,
@@ -48,7 +51,7 @@ export function HomeScreen({ onStartQuiz }: HomeScreenProps) {
       return
     }
     if (selectedMode) {
-      onStartQuiz({ mode: selectedMode, topic, difficulty })
+      onStartQuiz({ mode: selectedMode, topic, difficulty, useOllama })
     }
   }
 
@@ -172,6 +175,25 @@ export function HomeScreen({ onStartQuiz }: HomeScreenProps) {
                   <SelectItem value="advanced">Advanced</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="flex items-start space-x-3 p-4 rounded-lg border border-border bg-muted/30">
+            <Checkbox
+              id="use-ollama"
+              checked={useOllama}
+              onCheckedChange={(checked) => setUseOllama(checked === true)}
+            />
+            <div className="space-y-1 flex-1">
+              <Label htmlFor="use-ollama" className="flex items-center gap-2 cursor-pointer font-medium">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Ollama ile Dinamik Soru Üret
+              </Label>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {useOllama
+                  ? "⚠️ Soru üretimi 20-30 saniye sürebilir. Veritabanından çekmek için kapatın."
+                  : "Veritabanından hazır sorular çekilecek (hızlı). Yeni sorular üretmek için aktif edin."}
+              </p>
             </div>
           </div>
 

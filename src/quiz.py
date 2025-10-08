@@ -1,7 +1,8 @@
-import requests, json, re, os, datetime, uuid
+import requests, json, re, os, datetime, uuid , random
+import src.question as question
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "gpt-oss:20b"
+MODEL = "llama3:instruct"
 
 LEVEL_GUIDE = """
 BEGINNER → Temel tanım / doğrudan pasajdan bilgi.
@@ -31,6 +32,14 @@ def _call_ollama(prompt: str):
         q["id"] = str(uuid.uuid4())
         q["created_at"] = datetime.datetime.utcnow().isoformat()
     return q
+
+def generate_quiz(topic: str, level: str, n: int = 5):
+    quiz = []
+    for i in range(n):
+        qtype = random.choice(question.QUESTION_TYPES)  # rastgele tip seç
+        q = question.generate_question_from_context(topic, level, qtype)
+        quiz.append(q)
+    return {"topic": topic, "level": level, "items": quiz}
 
 
 # -------------------

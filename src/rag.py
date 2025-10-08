@@ -15,9 +15,9 @@ from chromadb.utils import embedding_functions
 # -----------------------
 # Config
 # -----------------------
-CHUNK_SIZE = 600
-CHUNK_OVERLAP = 150
-EMBED_MODEL = "all-MiniLM-L6-v2"
+CHUNK_SIZE = 1200
+CHUNK_OVERLAP = 200
+EMBED_MODEL = "intfloat/multilingual-e5-large"
 
 # -----------------------
 # Model & Vector Store
