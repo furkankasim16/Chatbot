@@ -12,9 +12,10 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 import sqlite3
+import json
 
 # Güvenlik ayarları
-SECRET_KEY = "your-secret-key-change-this-in-production"  # ÖNEMLİ: Production'da değiştirin!
+SECRET_KEY = "furkan-super-secret-key"  # ÖNEMLİ: Production'da değiştirin!
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 gün
 
@@ -24,39 +25,49 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 # Database helper
+DATABASE = "quiz.db"
+
 def get_db():
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
     return conn
+
 
 # Database initialization
 def init_users_db():
     conn = get_db()
     cursor = conn.cursor()
     
+    # Users table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             hashed_password TEXT NOT NULL,
-            is_admin INTEGER DEFAULT 0,
+            is_admin BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
+    
+   # Quiz attempts table (admin panel ile aynı)
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS quiz_results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            topic TEXT NOT NULL,
-            difficulty TEXT NOT NULL,
-            total_questions INTEGER NOT NULL,
-            correct_answers INTEGER NOT NULL,
-            completed_at TIMESTAMP NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
+    CREATE TABLE IF NOT EXISTS quiz_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        quiz_date TEXT NOT NULL,
+        topic TEXT NOT NULL,
+        difficulty TEXT NOT NULL,
+        total_questions INTEGER NOT NULL,
+        correct_answers INTEGER NOT NULL,
+        score REAL NOT NULL,
+        questions_attempted TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
     """)
+
+
     
     conn.commit()
     conn.close()
@@ -71,6 +82,7 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     username: str
+    is_admin: bool
 
 class QuizResult(BaseModel):
     topic: str
@@ -128,7 +140,9 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     user = get_user_by_username(username)
     if user is None:
         raise credentials_exception
+    print("🔍 current_user:", dict(user))
     return user
+    
 
 # Endpoints
 @router.post("/register", response_model=Token)
@@ -157,7 +171,7 @@ async def register(user: UserRegister):
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     
-    return {"access_token": access_token, "token_type": "bearer", "username": user.username}
+    return {"access_token": access_token, "token_type": "bearer", "username": user.username, "is_admin": False}
 
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -174,52 +188,75 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         data={"sub": user["username"]}, expires_delta=access_token_expires
     )
     
-    return {"access_token": access_token, "token_type": "bearer", "username": user["username"]}
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer", 
+        "username": user["username"],
+        "is_admin": bool(user["is_admin"])
+    }
+
+class QuizResult(BaseModel):
+    topic: str
+    difficulty: str
+    total_questions: int
+    correct_answers: int
+    completed_at: str
+    questions_attempted: Optional[list] = []  # ← Bu satırı ekleyin
 
 @router.post("/submit-result")
 async def submit_result(result: QuizResult, current_user = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
     
+    score = round((result.correct_answers / result.total_questions) * 100, 2)
     cursor.execute("""
-        INSERT INTO quiz_results (user_id, topic, difficulty, total_questions, correct_answers, completed_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (current_user["id"], result.topic, result.difficulty, result.total_questions, 
-          result.correct_answers, result.completed_at))
+    INSERT INTO quiz_attempts (
+        user_id, quiz_date, topic, difficulty,
+        total_questions, correct_answers, score, questions_attempted
+    ) VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?)
+    """, (
+    current_user["id"],
+    result.topic,
+    result.difficulty,
+    result.total_questions,
+    result.correct_answers,
+    score,
+    json.dumps(result.questions_attempted, ensure_ascii=False)  # ← Bu satırı değiştirin
+    ))
     
     conn.commit()
     conn.close()
     
     return {"message": "Sonuç kaydedildi"}
-
 @router.get("/stats", response_model=UserStats)
 async def get_stats(current_user = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
     
-    # Total stats
     cursor.execute("""
-        SELECT 
-            COUNT(*) as total_quizzes,
-            SUM(total_questions) as total_questions,
-            SUM(correct_answers) as correct_answers,
-            MAX(completed_at) as last_quiz_date
-        FROM quiz_results
-        WHERE user_id = ?
+    SELECT 
+        COUNT(*) as total_quizzes,
+        SUM(total_questions) as total_questions,
+        SUM(correct_answers) as correct_answers,
+        MAX(quiz_date) as last_quiz_date
+    FROM quiz_attempts
+    WHERE user_id = ?
     """, (current_user["id"],))
+
     
     stats = cursor.fetchone()
     
     # Topic stats
     cursor.execute("""
-        SELECT 
-            topic,
-            SUM(correct_answers) as correct,
-            SUM(total_questions) as total
-        FROM quiz_results
-        WHERE user_id = ?
-        GROUP BY topic
+    SELECT 
+        topic,
+        SUM(correct_answers) as correct,
+        SUM(total_questions) as total
+    FROM quiz_attempts
+    WHERE user_id = ?
+    GROUP BY topic
     """, (current_user["id"],))
+
     
     topic_stats = {}
     for row in cursor.fetchall():
@@ -238,4 +275,71 @@ async def get_stats(current_user = Depends(get_current_user)):
         "topic_stats": topic_stats
     }
 
+# Ana FastAPI uygulamanıza ekleyin:
+# app.include_router(router)
+# 
+# Uygulama başlatılırken:
+# init_users_db()
 
+@router.get("/stats")
+async def get_user_stats(current_user: dict = Depends(get_current_user)):
+    """Kullanıcının quiz istatistiklerini getirir."""
+    user_id = current_user["id"]
+    
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    
+    # Toplam quiz sayısı
+    c.execute("SELECT COUNT(*) FROM quiz_attempts WHERE user_id = ?", (user_id,))
+    total_quizzes = c.fetchone()[0]
+    
+    # Toplam soru ve doğru cevap sayısı
+    c.execute("""
+        SELECT 
+            SUM(total_questions) as total_q,
+            SUM(correct_answers) as correct_a
+        FROM quiz_attempts 
+        WHERE user_id = ?
+    """, (user_id,))
+    row = c.fetchone()
+    total_questions = row[0] or 0
+    correct_answers = row[1] or 0
+    
+    # Son quiz tarihi
+    c.execute("""
+        SELECT quiz_date 
+        FROM quiz_attempts 
+        WHERE user_id = ? 
+        ORDER BY quiz_date DESC 
+        LIMIT 1
+    """, (user_id,))
+    last_quiz = c.fetchone()
+    last_quiz_date = last_quiz[0] if last_quiz else None
+    
+    # Konu bazlı istatistikler
+    c.execute("""
+        SELECT 
+            topic,
+            SUM(total_questions) as total,
+            SUM(correct_answers) as correct
+        FROM quiz_attempts 
+        WHERE user_id = ?
+        GROUP BY topic
+    """, (user_id,))
+    
+    topic_stats = {}
+    for row in c.fetchall():
+        topic_stats[row[0]] = {
+            "total": row[1],
+            "correct": row[2]
+        }
+    
+    conn.close()
+    
+    return {
+        "total_quizzes": total_quizzes,
+        "total_questions": total_questions,
+        "correct_answers": correct_answers,
+        "last_quiz_date": last_quiz_date,
+        "topic_stats": topic_stats
+    }

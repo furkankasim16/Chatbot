@@ -35,6 +35,7 @@ export interface LoginResponse {
   access_token: string
   token_type: string
   username: string
+  is_admin: boolean
 }
 
 export interface RegisterRequest {
@@ -58,6 +59,28 @@ export interface QuizResult {
   total_questions: number
   correct_answers: number
   completed_at: string
+  questions_attempted?: Array<{
+    question_id: string
+    user_answer: string
+    is_correct: boolean
+  }>
+}
+
+export interface QuizAttempt {
+  id: number
+  user_id: number
+  username: string
+  quiz_date: string
+  topic: string
+  difficulty: string
+  total_questions: number
+  correct_answers: number
+  score: number
+  questions_attempted: Array<{
+    question_id: string
+    user_answer: string
+    is_correct: boolean
+  }>
 }
 
 const MOCK_QUESTIONS: Question[] = [
@@ -288,21 +311,34 @@ export async function register(username: string, email: string, password: string
 
 // Get user stats
 export async function getUserStats(token: string): Promise<UserStats> {
+  console.log("[v0] getUserStats called")
+  console.log("[v0] API URL:", `${API_BASE_URL}/auth/stats`)
+
   const res = await fetch(`${API_BASE_URL}/auth/stats`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   })
 
+  console.log("[v0] getUserStats response status:", res.status)
+
   if (!res.ok) {
+    const errorText = await res.text().catch(() => "Unknown error")
+    console.error("[v0] getUserStats error:", errorText)
     throw new Error("İstatistikler yüklenemedi")
   }
 
-  return res.json()
+  const stats = await res.json()
+  console.log("[v0] getUserStats response data:", stats)
+  return stats
 }
 
 // Submit quiz result
 export async function submitQuizResult(token: string, result: QuizResult): Promise<void> {
+  console.log("[v0] submitQuizResult called")
+  console.log("[v0] API URL:", `${API_BASE_URL}/auth/submit-result`)
+  console.log("[v0] Result data:", result)
+
   const res = await fetch(`${API_BASE_URL}/auth/submit-result`, {
     method: "POST",
     headers: {
@@ -312,9 +348,16 @@ export async function submitQuizResult(token: string, result: QuizResult): Promi
     body: JSON.stringify(result),
   })
 
+  console.log("[v0] submitQuizResult response status:", res.status)
+
   if (!res.ok) {
+    const errorText = await res.text().catch(() => "Unknown error")
+    console.error("[v0] submitQuizResult error:", errorText)
     throw new Error("Sonuç kaydedilemedi")
   }
+
+  const responseData = await res.json().catch(() => null)
+  console.log("[v0] submitQuizResult response data:", responseData)
 }
 
 // Generate random question (Admin only)
@@ -388,4 +431,20 @@ export async function createFirstAdmin(username: string, email: string, password
     const error = await res.json().catch(() => ({ detail: "İlk admin oluşturulamadı" }))
     throw new Error(error.detail || "İlk admin oluşturulamadı")
   }
+}
+
+// Get all user activity (Admin only)
+export async function getUserActivity(token: string): Promise<QuizAttempt[]> {
+  const res = await fetch(`${API_BASE_URL}/admin/user-activity`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Kullanıcı aktivitesi yüklenemedi" }))
+    throw new Error(error.detail || "Kullanıcı aktivitesi yüklenemedi")
+  }
+
+  return res.json()
 }

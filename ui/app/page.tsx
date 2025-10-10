@@ -57,10 +57,14 @@ export interface QuizConfig {
 }
 
 interface ExtendedLoginResponse extends LoginResponse {
-  is_admin?: boolean
+  is_admin: boolean
 }
 
 export default function QuizWidget() {
+  console.log("=".repeat(80))
+  console.log("[v0] ========== QUIZWIDGET COMPONENT RENDERING ==========")
+  console.log("=".repeat(80))
+
   const [screen, setScreen] = useState<"auth" | "home" | "quiz" | "feedback" | "results" | "stats" | "admin">("auth")
   const [config, setConfig] = useState<QuizConfig | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -219,29 +223,71 @@ export default function QuizWidget() {
       }
 
       if (user && config) {
-        const correctCount = questions.filter((q) => {
-          const userAnswer = userAnswers[q.id]
-          if (!userAnswer) return false
+        console.log("[v0] ===== QUIZ COMPLETION STARTED =====")
+        console.log("[v0] User:", user.username)
+        console.log("[v0] Config:", config)
+        console.log("[v0] Total questions:", questions.length)
 
-          if (q.type === "mcq" || q.type === "true_false") {
-            return String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()
+        const questionsAttempted = questions.map((q) => {
+          const userAnswer = userAnswers[q.id]
+          let isCorrect = false
+
+          if (userAnswer) {
+            if (q.type === "mcq" || q.type === "true_false") {
+              isCorrect = String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()
+            } else if (q.type === "short_answer") {
+              const normalize = (str: string) =>
+                str
+                  .toLowerCase()
+                  .trim()
+                  .replace(/[.,!?;:]/g, "")
+              isCorrect = normalize(String(userAnswer)) === normalize(String(q.correctAnswer))
+            }
           }
-          return false
-        }).length
+
+          return {
+            question_id: q.id,
+            user_answer: Array.isArray(userAnswer) ? userAnswer.join("; ") : String(userAnswer || ""),
+            is_correct: isCorrect,
+          }
+        })
+
+        const correctCount = questionsAttempted.filter((q) => q.is_correct).length
+        console.log("[v0] Correct answers:", correctCount, "/", questions.length)
+
+        const quizResult = {
+          topic: config.topic,
+          difficulty: config.difficulty,
+          total_questions: questions.length,
+          correct_answers: correctCount,
+          completed_at: new Date().toISOString(),
+          questions_attempted: questionsAttempted,
+        }
+
+        console.log("[v0] Quiz result to submit:", quizResult)
 
         try {
-          await submitQuizResult(user.access_token, {
-            topic: config.topic,
-            difficulty: config.difficulty,
-            total_questions: questions.length,
-            correct_answers: correctCount,
-            completed_at: new Date().toISOString(),
-          })
+          console.log("[v0] Calling submitQuizResult...")
+          const submitResponse = await submitQuizResult(user.access_token, quizResult)
+          console.log("[v0] ✓ Quiz result saved successfully:", submitResponse)
 
+          console.log("[v0] Reloading user stats...")
           await loadUserStats(user.access_token)
+          console.log("[v0] ✓ User stats reloaded")
+          console.log("[v0] Updated stats:", userStats)
         } catch (error) {
-          console.error("[v0] Failed to submit quiz result:", error)
+          console.error("[v0] ✗ Failed to save quiz result:", error)
+          if (error instanceof Error) {
+            console.error("[v0] Error message:", error.message)
+            console.error("[v0] Error stack:", error.stack)
+          }
         }
+
+        console.log("[v0] ===== QUIZ COMPLETION FINISHED =====")
+      } else {
+        console.log("[v0] ⚠ Quiz completion skipped - no user or config")
+        console.log("[v0] User:", user)
+        console.log("[v0] Config:", config)
       }
 
       setScreen("results")
@@ -259,21 +305,21 @@ export default function QuizWidget() {
   }
 
   const handleLogin = async (username: string, password: string) => {
-    const response = (await login(username, password)) as ExtendedLoginResponse
+    const response = await login(username, password)
     setUser(response)
     localStorage.setItem("auth_token", response.access_token)
     localStorage.setItem("username", response.username)
-    localStorage.setItem("is_admin", String(response.is_admin || false))
+    localStorage.setItem("is_admin", String(response.is_admin))
     setScreen("home")
     await loadUserStats(response.access_token)
   }
 
   const handleRegister = async (username: string, email: string, password: string) => {
-    const response = (await register(username, email, password)) as ExtendedLoginResponse
+    const response = await register(username, email, password)
     setUser(response)
     localStorage.setItem("auth_token", response.access_token)
     localStorage.setItem("username", response.username)
-    localStorage.setItem("is_admin", String(response.is_admin || false))
+    localStorage.setItem("is_admin", String(response.is_admin))
     setScreen("home")
     await loadUserStats(response.access_token)
   }
@@ -298,6 +344,20 @@ export default function QuizWidget() {
 
   const currentQuestion = questions[currentQuestionIndex]
 
+  console.log("\n[v0] ===== COMPONENT TYPE CHECKS =====")
+  console.log("[v0] HomeScreen:", typeof HomeScreen, HomeScreen === undefined ? "UNDEFINED!" : "OK")
+  console.log("[v0] QuizInterface:", typeof QuizInterface, QuizInterface === undefined ? "UNDEFINED!" : "OK")
+  console.log("[v0] FeedbackScreen:", typeof FeedbackScreen, FeedbackScreen === undefined ? "UNDEFINED!" : "OK")
+  console.log("[v0] ResultsScreen:", typeof ResultsScreen, ResultsScreen === undefined ? "UNDEFINED!" : "OK")
+  console.log("[v0] AuthScreen:", typeof AuthScreen, AuthScreen === undefined ? "UNDEFINED!" : "OK")
+  console.log("[v0] StatsScreen:", typeof StatsScreen, StatsScreen === undefined ? "UNDEFINED!" : "OK")
+  console.log("[v0] AdminPanel:", typeof AdminPanel, AdminPanel === undefined ? "UNDEFINED!" : "OK")
+  console.log("[v0] UserMenu:", typeof UserMenu, UserMenu === undefined ? "UNDEFINED!" : "OK")
+  console.log("[v0] ThemeToggle:", typeof ThemeToggle, ThemeToggle === undefined ? "UNDEFINED!" : "OK")
+  console.log("[v0] Current screen:", screen)
+  console.log("[v0] User logged in:", !!user)
+  console.log("[v0] ================================\n")
+
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-3xl mx-auto">
@@ -313,7 +373,7 @@ export default function QuizWidget() {
             {user && (
               <UserMenu
                 username={user.username}
-                isAdmin={user.is_admin}
+                isAdmin={user.is_admin || false}
                 onViewStats={handleViewStats}
                 onViewAdminPanel={handleViewAdminPanel}
                 onLogout={handleLogout}
@@ -322,13 +382,33 @@ export default function QuizWidget() {
           </div>
         </div>
 
-        {screen === "auth" && <AuthScreen onLogin={handleLogin} onRegister={handleRegister} />}
+        {screen === "auth" && (
+          <>
+            {console.log("[v0] Rendering AuthScreen...")}
+            <AuthScreen onLogin={handleLogin} onRegister={handleRegister} />
+          </>
+        )}
 
-        {screen === "stats" && userStats && <StatsScreen stats={userStats} onBack={() => setScreen("home")} />}
+        {screen === "stats" && userStats && (
+          <>
+            {console.log("[v0] Rendering StatsScreen...")}
+            <StatsScreen stats={userStats} onBack={() => setScreen("home")} />
+          </>
+        )}
 
-        {screen === "admin" && user && <AdminPanel token={user.access_token} onBack={() => setScreen("home")} />}
+        {screen === "admin" && user && (
+          <>
+            {console.log("[v0] Rendering AdminPanel...")}
+            <AdminPanel token={user.access_token} onBack={() => setScreen("home")} />
+          </>
+        )}
 
-        {screen === "home" && <HomeScreen onStartQuiz={handleStartQuiz} />}
+        {screen === "home" && (
+          <>
+            {console.log("[v0] Rendering HomeScreen...")}
+            <HomeScreen onStartQuiz={handleStartQuiz} />
+          </>
+        )}
 
         {isLoading && (
           <Card className="p-12 flex flex-col items-center justify-center space-y-4">

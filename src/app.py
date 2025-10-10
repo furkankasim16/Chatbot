@@ -1,44 +1,64 @@
-from fastapi import FastAPI,UploadFile, File , Query
+from fastapi import FastAPI, UploadFile, File, Query
 from pydantic import BaseModel
-import src.rag as rag 
+import src.rag as rag
 import src.quiz as quiz
 from src.quiz import generate_quiz
 import src.question as question
-from src.auth import router, init_users_db
+import src.admin
+from src.auth import router as authrouter, init_users_db
 from src.admin import router as adminrouter
-import json, os, datetime
-import traceback, logging, random
+import json, os, datetime, traceback, logging, random
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+
+# ------------------------------
+# ENVIRONMENT SETUP
+# ------------------------------
 load_dotenv()
 
+# ------------------------------
+# APP INITIALIZATION
+# ------------------------------
+app = FastAPI(title="knowledge-bot", version="0.2.1")
 
-
-app = FastAPI(title="knowledge-bot", version="0.2.0")
-
-# CORS ayarları
+# ✅ CORS SETTINGS (frontend için gerekli)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL'iniz
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Authentication router'ı ekle
-app.include_router(router)
+# ------------------------------
+# ROUTER REGISTRATION
+# ------------------------------
+app.include_router(authrouter)     # Kullanıcı kayıt & login işlemleri
+app.include_router(adminrouter)    # Admin panel API’leri (Ollama + RAG destekli)
 
-app.include_router(adminrouter)
-
-# Uygulama başlatılırken veritabanını oluştur
+# ------------------------------
+# STARTUP CONFIG
+# ------------------------------
 @app.on_event("startup")
 async def startup():
+    """Uygulama başlarken veritabanlarını ve tabloları hazırla."""
     init_users_db()
-    
-question.init_db()
+    question.init_db()
+    logging.info("✅ Databases initialized successfully.")
 
-logging.basicConfig(level=logging.DEBUG)
+# ------------------------------
+# LOGGING
+# ------------------------------
+logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 
+# ------------------------------
+# HEALTH CHECK
+# ------------------------------
 class Health(BaseModel):
     status: str = "ok"
     service: str = "knowledge-bot"
@@ -47,6 +67,14 @@ class Health(BaseModel):
 def health():
     return Health()
 
+# ✅ CORS test endpoint'i
+@app.options("/__cors_test__")
+def cors_test():
+    return {"status": "ok"}
+
+# ------------------------------
+# FILE INDEXING (RAG)
+# ------------------------------
 @app.post("/index")
 async def index(file: UploadFile = File(...)):
     try:
@@ -57,8 +85,12 @@ async def index(file: UploadFile = File(...)):
         n_chunks = rag.index_doc(file.filename, text, topic="support_flow")
         return {"status": "indexed", "chunks": n_chunks}
     except Exception as e:
+        logging.error(traceback.format_exc())
         return {"status": "error", "detail": str(e)}
 
+# ------------------------------
+# RAG SEARCH & DELETE
+# ------------------------------
 @app.get("/search")
 async def search(q: str):
     results = rag.search(q)
@@ -73,16 +105,19 @@ async def delete(doc_id: str):
 async def delete_all():
     return rag.delete_all()
 
+# ------------------------------
+# QUIZ GENERATION
+# ------------------------------
 @app.post("/quiz")
 def create_quiz(topic: str, level: str, n: int = 5):
     return generate_quiz(topic, level, n)
 
+# ------------------------------
+# QUESTION MANAGEMENT
+# ------------------------------
 @app.post("/questions/generate_random")
 async def generate_random_question_endpoint():
-    """
-    Yeni bir soru üretir (HuggingFace API + RAG context).
-    DB'ye kaydeder ve soruyu JSON olarak döner.
-    """
+    """Yeni bir rastgele soru üretir (HuggingFace API + RAG context)."""
     topic = random.choice(question.TOPICS)
     level = random.choice(question.LEVELS)
     qtype = random.choice(question.QUESTION_TYPES)
@@ -93,15 +128,11 @@ async def generate_random_question_endpoint():
 
 @app.post("/questions/generate")
 async def generate_question_endpoint(
-    
     topic: str = Query(..., description="Soru konusu (örn: product_basics)"),
     level: str = Query(..., description="Zorluk seviyesi"),
-    qtype: str = Query(..., description="Soru tipi: mcq | truefalse | openended | scenario")
+    qtype: str = Query(..., description="Soru tipi: mcq | truefalse | openended | scenario"),
 ):
-    """
-    Yeni bir soru üretir (HuggingFace API + RAG context).
-    DB'ye kaydeder ve soruyu JSON olarak döner.
-    """
+    """Yeni bir soru üretir (HuggingFace API + RAG context)."""
     q = question.generate_question_from_context(topic, level, qtype)
     if "error" not in q:
         question.save_question(q)
@@ -110,25 +141,25 @@ async def generate_question_endpoint(
 @app.get("/questions/random")
 async def random_question(
     topic: str = Query(None, description="İsteğe bağlı: sadece bu topic için"),
-    level: str = Query(None, description="İsteğe bağlı: sadece bu zorluk için")
+    level: str = Query(None, description="İsteğe bağlı: sadece bu zorluk için"),
 ):
-    """
-    DB'den rastgele bir soru getirir.
-    """
+    """DB'den rastgele bir soru getirir."""
     q = question.get_random_question(topic=topic, level=level)
     if q:
         return q
-    return {"status": "error", "detail": "Veritabanında uygun soru bulunamadı"}    
+    return {"status": "error", "detail": "Veritabanında uygun soru bulunamadı"}
 
 @app.get("/questions/all")
 async def list_questions():
-    """
-    DB'deki tüm soruları getirir (debug amaçlı).
-    """
+    """DB'deki tüm soruları getirir (debug amaçlı)."""
     return question.get_all_questions()
-    
+
+# ------------------------------
+# TOPICS LIST
+# ------------------------------
 @app.get("/topics")
 async def list_topics():
+    """ChromaDB'de kayıtlı topic’leri döner."""
     try:
         data = rag.collection.get()  # tüm chunk’ları al
         topics_count = {}
@@ -140,12 +171,7 @@ async def list_topics():
 
         return {"topics": topics_count}
     except Exception as e:
-        
         logging.error(traceback.format_exc())
         return {"status": "error", "detail": str(e)}
-    
-    
-    
-
-
-
+if __name__ == "__main__":
+    init_users_db()

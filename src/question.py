@@ -154,6 +154,7 @@ def get_context_for_topic(topic: str, n_chunks: int = 3):
         return f"{topic} konusu hakkında genel bilgi ver. Bu konu hakkında temel kavramları öğretici şekilde açıkla."
 
     return "\n\n".join(passages)
+
 def build_prompt(topic, level, qtype, context):
     return f"""
 Sen bir eğitim tasarımcısı ve sınav yazarı olarak davran.
