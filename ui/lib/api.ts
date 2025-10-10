@@ -448,3 +448,4 @@ export async function getUserActivity(token: string): Promise<QuizAttempt[]> {
 
   return res.json()
 }
+  

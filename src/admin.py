@@ -410,5 +410,56 @@ async def startup_event():
     """Uygulama başlangıcında gerekli tabloları oluştur."""
     init_quiz_attempts_table()
 
-# ... existing code for other endpoints ...
+# -----------------------
+# 🔹 Generate Question by Topic-Level-Type
+# -----------------------
+@router.post("/generate-question", tags=["admin"])
+async def generate_question_endpoint(
+    topic: str,
+    level: str,
+    qtype: str,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """
+    Admin panelinden belirli konu, seviye ve türde soru üretir.
+    """
+    print(f"⚙️ Generating question: topic={topic}, level={level}, qtype={qtype}")
+
+    context = retrieve_context(topic)
+    if not context:
+        raise HTTPException(status_code=404, detail=f"No context found for topic '{topic}'.")
+
+    # Ollama'dan soru oluştur
+    question_data = generate_with_ollama_rag(qtype, topic, level, context)
+
+    # Veritabanına kaydet
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        """
+        INSERT INTO questions (type, topic, level, stem, choices, answer, answer_index, expected, rationale)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            question_data["type"],
+            question_data["topic"],
+            question_data["level"],
+            question_data["stem"],
+            json.dumps(question_data["choices"], ensure_ascii=False),
+            question_data.get("answer", ""),
+            question_data.get("answer_index", 0),
+            question_data.get("expected", ""),
+            question_data.get("rationale", ""),
+        ),
+    )
+    conn.commit()
+    qid = c.lastrowid
+    conn.close()
+
+    print(f"💾 New question saved with ID {qid}")
+
+    return {
+        "status": "success",
+        "question": {"id": qid, **question_data}
+    }
 
