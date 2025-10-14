@@ -7,9 +7,11 @@ import src.question as question
 import src.admin
 from src.auth import router as authrouter, init_users_db
 from src.admin import router as adminrouter
+from src.evaluate import router as evaluaterouter
 import json, os, datetime, traceback, logging, random
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from src import evaluate
 
 # ------------------------------
 # ENVIRONMENT SETUP
@@ -40,6 +42,7 @@ app.add_middleware(
 # ------------------------------
 app.include_router(authrouter)     # Kullanıcı kayıt & login işlemleri
 app.include_router(adminrouter)    # Admin panel API’leri (Ollama + RAG destekli)
+app.include_router(evaluaterouter) # Cevap değerlendirme API'si
 
 # ------------------------------
 # STARTUP CONFIG

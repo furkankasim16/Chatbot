@@ -10,6 +10,7 @@ import { StatsScreen } from "@/components/stats-screen"
 import { AdminPanel } from "@/components/admin-panel"
 import { UserMenu } from "@/components/user-menu"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { ChatScreen } from "@/components/chat-screen" 
 import {
   getQuestionsFromDB,
   generateQuiz,
@@ -17,6 +18,7 @@ import {
   register,
   getUserStats,
   submitQuizResult,
+  evaluateAnswer, // Yeni import eklendi
   type Question as APIQuestion,
   type UserStats,
   type LoginResponse,
@@ -65,7 +67,9 @@ export default function QuizWidget() {
   console.log("[v0] ========== QUIZWIDGET COMPONENT RENDERING ==========")
   console.log("=".repeat(80))
 
-  const [screen, setScreen] = useState<"auth" | "home" | "quiz" | "feedback" | "results" | "stats" | "admin">("auth")
+  const [screen, setScreen] = useState<"auth" | "home" | "quiz" | "feedback" | "results" | "stats" | "admin" | "chat">(
+    "auth",
+  ) // Added "chat" to screen state type
   const [config, setConfig] = useState<QuizConfig | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [userAnswers, setUserAnswers] = useState<Record<string, string | string[]>>({})
@@ -228,48 +232,72 @@ export default function QuizWidget() {
         console.log("[v0] Config:", config)
         console.log("[v0] Total questions:", questions.length)
 
-        const questionsAttempted = questions.map((q) => {
+        let correctCount = 0
+
+        // Her soru için değerlendirme yap
+        for (const q of questions) {
           const userAnswer = userAnswers[q.id]
+          if (!userAnswer) continue
+
           let isCorrect = false
 
-          if (userAnswer) {
-            if (q.type === "mcq" || q.type === "true_false") {
-              isCorrect = String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()
-            } else if (q.type === "short_answer") {
-              const normalize = (str: string) =>
-                str
-                  .toLowerCase()
-                  .trim()
-                  .replace(/[.,!?;:]/g, "")
-              isCorrect = normalize(String(userAnswer)) === normalize(String(q.correctAnswer))
+          if (q.type === "mcq" || q.type === "true_false") {
+            // MCQ ve True/False için direkt karşılaştırma
+            isCorrect = String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()
+          } else if (q.type === "short_answer") {
+            // Kısa cevap için normalize edilmiş karşılaştırma
+            const normalize = (str: string) =>
+              str
+                .toLowerCase()
+                .trim()
+                .replace(/[.,!?;:]/g, "")
+            isCorrect = normalize(String(userAnswer)) === normalize(String(q.correctAnswer))
+          } else if (q.type === "open_ended" || q.type === "scenario") {
+            // Açık uçlu ve senaryo soruları için AI değerlendirmesi
+            try {
+              console.log(`[v0] Evaluating ${q.type} question:`, q.id)
+              const evaluation = await evaluateAnswer(
+                user.access_token,
+                q.stem,
+                String(q.correctAnswer),
+                String(userAnswer),
+              )
+              console.log(`[v0] Evaluation result:`, evaluation)
+              isCorrect = evaluation.is_correct
+            } catch (error) {
+              console.error(`[v0] Failed to evaluate ${q.type} question:`, error)
+              // Hata durumunda fallback: basit kelime benzerliği
+              const userWords = String(userAnswer).toLowerCase().split(/\s+/)
+              const expectedWords = String(q.correctAnswer).toLowerCase().split(/\s+/)
+              const matchCount = userWords.filter((word) => expectedWords.includes(word)).length
+              const similarity = matchCount / Math.max(userWords.length, expectedWords.length)
+              isCorrect = similarity > 0.4 // %40 üzeri benzerlik
+              console.log(`[v0] Fallback similarity: ${(similarity * 100).toFixed(1)}%`)
             }
           }
 
-          return {
-            question_id: q.id,
-            user_answer: Array.isArray(userAnswer) ? userAnswer.join("; ") : String(userAnswer || ""),
-            is_correct: isCorrect,
+          if (isCorrect) {
+            correctCount++
           }
-        })
+        }
 
-        const correctCount = questionsAttempted.filter((q) => q.is_correct).length
         console.log("[v0] Correct answers:", correctCount, "/", questions.length)
 
+        // Backend'in beklediği formatta quiz result oluştur
         const quizResult = {
           topic: config.topic,
           difficulty: config.difficulty,
           total_questions: questions.length,
           correct_answers: correctCount,
           completed_at: new Date().toISOString(),
-          questions_attempted: questionsAttempted,
         }
 
         console.log("[v0] Quiz result to submit:", quizResult)
 
         try {
           console.log("[v0] Calling submitQuizResult...")
-          const submitResponse = await submitQuizResult(user.access_token, quizResult)
-          console.log("[v0] ✓ Quiz result saved successfully:", submitResponse)
+          await submitQuizResult(user.access_token, quizResult)
+          console.log("[v0] ✓ Quiz result saved successfully")
 
           console.log("[v0] Reloading user stats...")
           await loadUserStats(user.access_token)
@@ -403,10 +431,17 @@ export default function QuizWidget() {
           </>
         )}
 
+        {screen === "chat" && user && (
+          <>
+            {console.log("[v0] Rendering ChatScreen...")}
+            <ChatScreen token={user.access_token} context={config?.topic} onBack={() => setScreen("home")} />
+          </>
+        )}
+
         {screen === "home" && (
           <>
             {console.log("[v0] Rendering HomeScreen...")}
-            <HomeScreen onStartQuiz={handleStartQuiz} />
+            <HomeScreen onStartQuiz={handleStartQuiz} onChatMode={() => setScreen("chat")} />
           </>
         )}
 

@@ -46,7 +46,6 @@ def init_db():
 # Helpers
 # -----------------------
 def question_hash(q: dict) -> str:
-    """Her sorunun içeriğine göre benzersiz hash üret."""
     raw = json.dumps({
         "type": q.get("type"),
         "topic": q.get("topic"),
@@ -56,10 +55,8 @@ def question_hash(q: dict) -> str:
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 def save_question(q: dict):
-    """Soruyu veritabanına kaydet (duplicate kontrolüyle)."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-
     qhash = question_hash(q)
     try:
         c.execute("""
@@ -114,15 +111,12 @@ def get_random_question(topic: str = None, level: str = None):
         "created_at": row[9],
     }
 
-
-
 def get_all_questions(limit: int = 100):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT * FROM questions ORDER BY created_at DESC LIMIT ?", (limit,))
     rows = c.fetchall()
     conn.close()
-
     return [
         {
             "id": r[0],
@@ -141,54 +135,70 @@ def get_all_questions(limit: int = 100):
 # -----------------------
 # Context & Prompt
 # -----------------------
-def get_context_for_topic(topic: str, n_chunks: int = 3):
-    results = search(topic, top_k=n_chunks)
-    passages = []
 
+def get_context_for_topic(topic: str, n_chunks: int = 3):
+    """Belirli topic'e göre filtrelenmiş RAG context getirir."""
+    try:
+        results = search(topic, top_k=n_chunks, filters={"topic": topic})
+    except TypeError:
+        # Eğer search() filters parametresi almıyorsa fallback
+        results = search(topic, top_k=n_chunks)
+
+    passages = []
     if "documents" in results:
         for doc_list in results["documents"]:
             passages.extend(doc_list)
 
     if not passages:
-        # Eğer hiç pasaj yoksa, modelin boş dönmemesi için default bilgi gönder
-        return f"{topic} konusu hakkında genel bilgi ver. Bu konu hakkında temel kavramları öğretici şekilde açıkla."
-
+        return f"{topic} hakkında genel bilgi: temel kavramları öğretici biçimde açıkla."
     return "\n\n".join(passages)
 
-def build_prompt(topic, level, qtype, context):
-    return f"""
-Sen bir eğitim tasarımcısı ve sınav yazarı olarak davran.
-Aşağıdaki pasajlara dayanarak {topic} konusunda {level} seviyesinde bir {qtype} soru oluştur.
 
-Kurallar:
-1. Tüm içerik TÜRKÇE OLMAK ZORUNDA. 
-   - Soru metni, şıklar ve açıklama tamamen Türkçe olmalı. 
-   - İngilizce kelime, cümle veya açıklama KULLANMA.
-   - Eğer içerik Türkçe değilse, tekrar Türkçe üret.
-2. Cevap sadece pasajlardan çıkarılabilir, uydurma bilgi YASAK.
-3. JSON dışında hiçbir açıklama, ```json``` etiketi veya metin ekleme.
-4. “rationale” alanı neden o cevabın doğru olduğunu açıklasın.
-5. Soru seviyesi: 
-   - beginner: temel tanım / bilgi hatırlama
-   - intermediate: uygulama / yorum
-   - advanced: analiz / karşılaştırma
-6. + Cevapta İngilizce veya açıklama yazma. Yalnızca JSON üret. Eğer pasajlar boşsa, konu hakkında tahmini bir Türkçe soru üret.\n
-7. Daha önce ürettiğin bir soruyu üretme 
+def get_prompt_by_topic(topic: str, context: str, level: str, qtype: str):
+    """Etiket bazlı akıllı prompt seçimi."""
+    base_header = "Sen QuizBot adında bir yapay zekâ asistanısın.\n"
 
-Çıktı formatı:
-{{
-  "type": "{qtype}",
-  "topic": "{topic}",
-  "level": "{level}",
-  "stem": "SORU METNİ",
-  "choices": ["A) ...", "B) ...", "C) ...", "D) ..."],
-  "answer_index": 0,
-  "rationale": "cevabın sebebi"
-}}
+    if topic == "product_basics":
+        return f"""{base_header}
+Görevin: Rotamen ve Avansas sistemlerinin ürün işleyişi, Lucy/Lecy planlama, zone yönetimi ve mobil operasyon modülleri hakkında quiz soruları üretmek.
+Belgelerde planlama algoritmaları, araç sıralama, xDock/Subzone yönetimi, teslimat ve raporlama süreçleri anlatılmaktadır.
 
-Pasajlar:
+Aşağıdaki metne dayanarak {level} seviyesinde, {qtype} formatında, teknik terimler içeren 3-5 soru oluştur:
+- Belgede geçen terimleri (Lucy, Lecy, Subzone, Takas, Gün Sonu vb.) kullan.
+- Her sorunun A, B, C şıkları olsun, açıklamalı doğru cevabı yaz.
+
+Metin:
 {context}
 """
+
+    elif topic == "support_flow":
+        return f"""{base_header}
+Görevin: müşteri destek, teslimat sonrası süreçler ve saha operasyonları hakkında quiz soruları üretmek.
+Belgelerde Lucy planlama, Rotamen–SAP entegrasyonu, müşteri SMS bildirimleri, adres öğrenme ve teslimat izleme konuları geçmektedir.
+
+Aşağıdaki bilgilere dayanarak {level} seviyesinde {qtype} tipi sorular üret:
+- Operasyon adımlarını, kullanıcı davranışlarını ve iletişim kurallarını sorgulasın.
+- Her soru Türkçe, kısa, açıklamalı ve özgün olsun.
+
+Metin:
+{context}
+"""
+
+    elif topic == "security_policy":
+        return f"""{base_header}
+Görevin: ONUSS Şirket Prensipleri dokümanına dayanarak etik, gizlilik, bilgi güvenliği ve sosyal medya politikalarıyla ilgili quiz soruları üretmek.
+Belgelerde bütünlük, çıkar çatışması, veri gizliliği, sosyal medya, iş etiği ve gizli bilgi paylaşımı gibi konular anlatılmaktadır.
+
+Aşağıdaki metne dayanarak {level} seviyesinde {qtype} tipi sorular üret:
+- Gizlilik, etik, veri güvenliği ve davranış kurallarını ölçsün.
+- Şıklar açık, doğru cevap açıklamalı olmalı.
+
+Metin:
+{context}
+"""
+
+    else:
+        return f"{base_header}\nKonu belirtilmemiş. Genel bilgi soruları oluştur.\n\n{context}"
 
 # -----------------------
 # Question Generation
@@ -196,7 +206,7 @@ Pasajlar:
 def generate_question_from_context(topic: str, level: str, qtype: str):
     try:
         context = get_context_for_topic(topic)
-        prompt = build_prompt(topic, level, qtype, context)
+        prompt = get_prompt_by_topic(topic, context, level, qtype)
 
         res = requests.post(
             OLLAMA_URL,
@@ -217,7 +227,6 @@ def generate_question_from_context(topic: str, level: str, qtype: str):
         if not matches:
             return {"error": "JSON bulunamadı", "raw": cleaned}
 
-        # En uzun ve geçerli JSON'u seç
         for block in sorted(matches, key=len, reverse=True):
             try:
                 q = json.loads(block)
@@ -227,10 +236,8 @@ def generate_question_from_context(topic: str, level: str, qtype: str):
         else:
             return {"error": "Geçerli JSON parse edilemedi", "raw": cleaned}
 
-        # ✅ Validasyon
-        if q.get("type") == "mcq":
-            if not q.get("choices") or q.get("answer_index") is None:
-                return {"error": "Eksik seçenek veya cevap", "raw": q}
+        if q.get("type") == "mcq" and (not q.get("choices") or q.get("answer_index") is None):
+            return {"error": "Eksik seçenek veya cevap", "raw": q}
         if not q.get("stem"):
             return {"error": "Soru metni eksik"}
 

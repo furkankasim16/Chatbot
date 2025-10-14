@@ -13,9 +13,10 @@ import useSWR from "swr"
 
 interface HomeScreenProps {
   onStartQuiz: (config: QuizConfig) => void
+  onChatMode: () => void
 }
 
-export function HomeScreen({ onStartQuiz }: HomeScreenProps) {
+export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
   const [selectedMode, setSelectedMode] = useState<QuizMode | null>(null)
   const [topic, setTopic] = useState("product_basics")
   const [difficulty, setDifficulty] = useState<Difficulty>("beginner")
@@ -124,6 +125,18 @@ export function HomeScreen({ onStartQuiz }: HomeScreenProps) {
           )
         })}
       </div>
+
+      <Card className="p-6 bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-foreground">Chat Modu</h3>
+            <p className="text-sm text-muted-foreground">Yapay zeka ile sohbet edin, sorularınızı sorun</p>
+          </div>
+          <Button onClick={onChatMode} variant="secondary" size="lg">
+            Chat Moduna Geç
+          </Button>
+        </div>
+      </Card>
 
       {selectedMode && (
         <Card className="p-6 animate-slide-in space-y-6">

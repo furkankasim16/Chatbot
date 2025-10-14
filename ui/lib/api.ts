@@ -53,17 +53,11 @@ export interface UserStats {
 }
 
 export interface QuizResult {
-  quiz_id?: string
   topic: string
   difficulty: string
   total_questions: number
   correct_answers: number
   completed_at: string
-  questions_attempted?: Array<{
-    question_id: string
-    user_answer: string
-    is_correct: boolean
-  }>
 }
 
 export interface QuizAttempt {
@@ -81,6 +75,27 @@ export interface QuizAttempt {
     user_answer: string
     is_correct: boolean
   }>
+}
+
+export interface EvaluateAnswerRequest {
+  question: string
+  expected: string
+  user_answer: string
+}
+
+export interface EvaluateAnswerResponse {
+  score: number // 1-5 arası
+  is_correct: boolean // 4-5 puan ise true
+  feedback?: string // Opsiyonel geri bildirim
+}
+
+export interface ChatRequest {
+  message: string
+  context?: string
+}
+
+export interface ChatResponse {
+  response: string
 }
 
 const MOCK_QUESTIONS: Question[] = [
@@ -448,4 +463,99 @@ export async function getUserActivity(token: string): Promise<QuizAttempt[]> {
 
   return res.json()
 }
-  
+
+// Evaluate answer for open-ended and scenario questions
+export async function evaluateAnswer(
+  token: string,
+  question: string,
+  expected: string,
+  userAnswer: string,
+): Promise<EvaluateAnswerResponse> {
+  console.log("[v0] evaluateAnswer called")
+  console.log("[v0] Question:", question)
+  console.log("[v0] Expected:", expected)
+  console.log("[v0] User answer:", userAnswer)
+
+  const res = await fetch(`${API_BASE_URL}/evaluate-answer`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      question,
+      expected,
+      user_answer: userAnswer,
+    }),
+  })
+
+  console.log("[v0] evaluateAnswer response status:", res.status)
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "Unknown error")
+    console.error("[v0] evaluateAnswer error:", errorText)
+    throw new Error("Cevap değerlendirilemedi")
+  }
+
+  const result = await res.json()
+  console.log("[v0] evaluateAnswer response:", result)
+  return result
+}
+
+// Send chat message
+export async function sendChatMessage(token: string, message: string, context?: string): Promise<ChatResponse> {
+  console.log("[v0] sendChatMessage called")
+  console.log("[v0] API URL:", `${API_BASE_URL}/chat`)
+  console.log("[v0] Message:", message)
+  console.log("[v0] Context:", context)
+
+  // Request body'yi oluştur
+  const requestBody = {
+    message: message,
+    ...(context && { context: context }),
+  }
+
+  console.log("[v0] Request body:", JSON.stringify(requestBody))
+
+  // AbortController ile timeout kontrolü
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 120000) // 120 saniye timeout
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    console.log("[v0] sendChatMessage response status:", res.status)
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "Unknown error")
+      console.error("[v0] sendChatMessage error response:", errorText)
+      throw new Error(`Mesaj gönderilemedi: ${res.status} ${errorText}`)
+    }
+
+    const result = await res.json()
+    console.log("[v0] sendChatMessage response:", result)
+    return result
+  } catch (error) {
+    clearTimeout(timeoutId)
+
+    if (error instanceof Error && error.name === "AbortError") {
+      console.error("[v0] sendChatMessage timeout")
+      throw new Error(
+        "İstek zaman aşımına uğradı. Lütfen daha kısa bir mesaj deneyin veya backend'in çalıştığından emin olun.",
+      )
+    }
+
+    console.error("[v0] sendChatMessage error:", error)
+    throw error
+  }
+}
