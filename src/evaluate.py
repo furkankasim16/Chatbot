@@ -1,11 +1,3 @@
-"""
-Chat endpoint'ini backend'e entegre etmek için bu dosyayı kullanın.
-
-ADIM 1: Bu dosyayı backend klasörünüze 'chat.py' olarak kaydedin
-ADIM 2: app.py dosyanızı güncelleyin (aşağıdaki talimatları takip edin)
-ADIM 3: Backend'i yeniden başlatın
-"""
-
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import requests

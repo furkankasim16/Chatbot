@@ -13,6 +13,10 @@ import chromadb
 from chromadb.utils import embedding_functions
 import re
 import uuid
+import hashlib
+
+ALLOWED_TOPICS = {"security_policy", "support_flow", "product_basics"}
+ALLOWED_LEVELS = {"beginner", "intermediate", "advanced"}
 
 # -----------------------
 # Config
@@ -21,7 +25,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 SECRET_KEY = "furkan-super-secret-key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-DATABASE = "quiz.db"
+DATABASE = "data/questions/questions.db"
 USERDB = "quiz.db"
 OLLAMA_URL = "http://localhost:11434"
 
@@ -37,6 +41,55 @@ collection = client.get_or_create_collection(
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+def _normalize_topic(topic: str) -> str:
+    t = (topic or "").strip().lower().replace(" ", "_")
+    if t == "product_basic":
+        t = "product_basics"
+    return t
+
+def _normalize_level(level: str) -> str:
+    l = (level or "").strip().lower()
+    aliases = {"basic": "beginner", "mid": "intermediate", "adv": "advanced"}
+    return aliases.get(l, l)
+
+def _stable_hash(stem: str, choices: list, topic: str, level: str) -> str:
+    payload = json.dumps(
+        {"stem": stem.strip(), "choices": [str(c).strip() for c in choices], "topic": topic, "level": level},
+        ensure_ascii=False, separators=(",", ":")
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+def _answer_to_index(answer: str, choices: list) -> int:
+    """
+    Model 'A'/'B'… harfi verdiyse 0-3'e mapler; değilse choices içinde eşleşirse o index; yoksa 0.
+    """
+    if not choices:
+        return 0
+    a = (answer or "").strip()
+    # Harf ise (A/B/C/D)
+    if len(a) == 1 and a.upper() in "ABCD":
+        return "ABCD".index(a.upper())
+    # "A) ..." formatı gelmişse
+    m = re.match(r"^\s*([A-Da-d])\)\s*", a)
+    if m:
+        return "ABCD".index(m.group(1).upper())
+    # Metinle eşle
+    for i, ch in enumerate(choices):
+        if str(ch).strip().lower() == a.lower():
+            return i
+        # "A) ..." gibi şıklı choices varsa sadece metin kısmını karşılaştır
+        m2 = re.match(r"^\s*[A-Da-d]\)\s*(.+)$", str(ch).strip())
+        if m2 and m2.group(1).strip().lower() == a.lower():
+            return i
+    return 0
+
+def _ensure_unique_hash_index():
+    conn = sqlite3.connect(DATABASE, check_same_thread=False)
+    cur = conn.cursor()
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_questions_hash ON questions(hash);")
+    conn.commit()
+    conn.close()
 
 # -----------------------
 # Auth helpers
@@ -290,7 +343,7 @@ async def generate_random_question_rag(current_user: dict = Depends(get_current_
 
     question_data = generate_with_ollama_rag(q_type, topic, level, context)
 
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(USERDB)
     c = conn.cursor()
     c.execute(
         """
@@ -338,7 +391,7 @@ async def delete_question(qid: int, current_user: dict = Depends(get_current_adm
 @router.get("/user-activity")
 async def get_user_activity(current_user: dict = Depends(get_current_admin_user)):
     """Admin panelinde: tüm kullanıcıların quiz aktivitelerini döner."""
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(USERDB)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     
@@ -383,7 +436,7 @@ async def get_user_activity(current_user: dict = Depends(get_current_admin_user)
 
 def init_quiz_attempts_table():
     """Quiz attempts tablosunu oluşturur."""
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(USERDB)
     conn.execute("PRAGMA foreign_keys = ON;")  # ✅ foreign key desteği
     c = conn.cursor()
     c.execute("""

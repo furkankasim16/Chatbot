@@ -7,16 +7,33 @@ import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
-import type { Question } from "@/app/page"
+import { Badge } from "@/components/ui/badge"
+import { Clock } from "lucide-react"
+// eski: import type { Question } from "@/app/page"
+import type { Question } from "@/app/types/quiz"
 
 interface QuizInterfaceProps {
   question: Question
   questionNumber: number
   totalQuestions: number
   onSubmit: (questionId: string, answer: string | string[]) => void
+  questionTime?: number
+  formatTime?: (ms: number) => string
 }
 
-export function QuizInterface({ question, questionNumber, totalQuestions, onSubmit }: QuizInterfaceProps) {
+export function QuizInterface({
+  question,
+  questionNumber,
+  totalQuestions,
+  onSubmit,
+  questionTime = 0,
+  formatTime = (ms) => {
+    const totalSeconds = Math.floor(ms / 1000)
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+  },
+}: QuizInterfaceProps) {
   const [answer, setAnswer] = useState<string>("")
   const [scenarioAnswers, setScenarioAnswers] = useState<Record<number, string>>({})
   const [currentStep, setCurrentStep] = useState(1)
@@ -42,17 +59,13 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
 
   const isAnswerValid = () => {
     if (question.type === "scenario") {
-      if (question.steps && question.steps.length > 0) {
-        return scenarioAnswers[currentStep]?.trim().length > 0
-      }
-      return answer.trim().length > 0
+      return scenarioAnswers[currentStep]?.trim().length > 0
     }
     return answer.trim().length > 0
   }
 
   return (
     <div className="animate-fade-in space-y-6">
-      {/* Progress bar */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
@@ -63,31 +76,33 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
         <Progress value={progress} className="h-2" />
       </div>
 
-      {/* Main card */}
       <Card className="p-8 space-y-6">
-        {/* Normal question types */}
         {question.type !== "scenario" ? (
           <>
-            {/* Header */}
             <div className="space-y-3">
-              <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                {question.type === "mcq"
-                  ? "Multiple Choice"
-                  : question.type === "true_false"
-                  ? "True/False"
-                  : question.type === "open_ended"
-                  ? "Open Ended"
-                  : "Short Answer"}
+              <div className="flex items-center justify-between">
+                <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                  {question.type === "mcq"
+                    ? "Multiple Choice"
+                    : question.type === "true_false"
+                      ? "True/False"
+                        : question.type === "open_ended"
+                          ? "Open Ended"
+                          : "Short Answer"}
+                </div>
+                <Badge variant="outline" className="flex items-center gap-1.5">
+                  <Clock className="w-3 h-3" />
+                  <span className="text-xs">{formatTime(questionTime)}</span>
+                </Badge>
               </div>
-              <h2 className="text-2xl font-semibold text-card-foreground leading-relaxed">
+              <h2 className="text-2xl font-semibold text-card-foreground text-balance leading-relaxed">
                 {question.stem}
               </h2>
             </div>
 
-            {/* Multiple Choice */}
             {question.type === "mcq" && question.options && (
               <RadioGroup value={answer} onValueChange={setAnswer} className="space-y-3">
-                {question.options.map((option: string, index: number) => (
+                {question.options.map((option, index) => (
                   <div
                     key={index}
                     className="flex items-start space-x-3 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer"
@@ -102,12 +117,11 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
               </RadioGroup>
             )}
 
-            {/* True/False */}
             {question.type === "true_false" && (
               <RadioGroup value={answer} onValueChange={setAnswer} className="space-y-3">
-                {["true", "false"].map((option: string, index: number) => (
+                {["true", "false"].map((option) => (
                   <div
-                    key={index}
+                    key={option}
                     className="flex items-center space-x-3 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer"
                     onClick={() => setAnswer(option)}
                   >
@@ -120,11 +134,7 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
               </RadioGroup>
             )}
 
-            {/* Short Answer & Open Ended */}
-            {(
-              question.type === "short_answer" ||
-              question.type === "open_ended"
-            ) && (
+            {(question.type === "short_answer" || question.type === "open_ended") && (
               <div className="space-y-2">
                 <Label htmlFor="answer" className="text-sm font-medium">
                   Your Answer
@@ -145,18 +155,22 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
           </>
         ) : (
           <>
-            {/* Scenario Mode */}
             <div className="space-y-3">
-              <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                Scenario - Step {currentStep} of {question.steps?.length || 1}
+              <div className="flex items-center justify-between">
+                <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                  Scenario - Step {currentStep} of {question.steps?.length || 1}
+                </div>
+                <Badge variant="outline" className="flex items-center gap-1.5">
+                  <Clock className="w-3 h-3" />
+                  <span className="text-xs">{formatTime(questionTime)}</span>
+                </Badge>
               </div>
-              <h2 className="text-2xl font-semibold text-card-foreground leading-relaxed">
+              <h2 className="text-2xl font-semibold text-card-foreground text-balance leading-relaxed">
                 {question.stem}
               </h2>
             </div>
 
-            {/* Steps varsa */}
-            {question.steps && question.steps.length > 0 ? (
+            {question.steps && (
               <div className="space-y-4">
                 <div className="p-4 rounded-lg bg-muted/50 border border-border">
                   <p className="text-sm font-medium text-muted-foreground mb-2">Step {currentStep}</p>
@@ -172,45 +186,23 @@ export function QuizInterface({ question, questionNumber, totalQuestions, onSubm
                   <Textarea
                     id="scenario-answer"
                     value={scenarioAnswers[currentStep] || ""}
-                    onChange={(e) =>
-                      setScenarioAnswers((prev) => ({
-                        ...prev,
-                        [currentStep]: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setScenarioAnswers((prev) => ({ ...prev, [currentStep]: e.target.value }))}
                     placeholder="Describe your approach..."
                     className="min-h-32 text-base leading-relaxed"
                   />
                 </div>
               </div>
-            ) : (
-              // Steps yoksa fallback Textarea
-              <div className="space-y-2">
-                <Label htmlFor="scenario-fallback" className="text-sm font-medium">
-                  Your Response
-                </Label>
-                <Textarea
-                  id="scenario-fallback"
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="Write your answer here..."
-                  className="min-h-40 text-base leading-relaxed"
-                />
-              </div>
             )}
           </>
         )}
 
-        {/* Submit / Next Button */}
         <Button
           onClick={question.type === "scenario" ? handleScenarioNext : handleSubmit}
           disabled={!isAnswerValid()}
           className="w-full h-12 text-base font-medium"
           size="lg"
         >
-          {question.type === "scenario" && currentStep < (question.steps?.length || 1)
-            ? "Next Step"
-            : "Submit Answer"}
+          {question.type === "scenario" && currentStep < (question.steps?.length || 1) ? "Next Step" : "Submit Answer"}
         </Button>
       </Card>
     </div>

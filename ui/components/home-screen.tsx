@@ -31,6 +31,12 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
   } = useSWR("topics", getTopics, { revalidateOnFocus: false })
 
   useEffect(() => {
+    console.log("[v0] [TOPICS] Loading:", topicsLoading)
+    console.log("[v0] [TOPICS] Error:", topicsError)
+    console.log("[v0] [TOPICS] Data:", topicsData)
+  }, [topicsLoading, topicsError, topicsData])
+
+  useEffect(() => {
     const lastDailyCompletion = localStorage.getItem("lastDailyQuizCompletion")
     if (lastDailyCompletion) {
       const lastTime = new Date(lastDailyCompletion).getTime()
@@ -55,7 +61,7 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
       onStartQuiz({ mode: selectedMode, topic, difficulty, useOllama })
     }
   }
-
+  
   const modes = [
     {
       id: "quick" as QuizMode,
@@ -82,7 +88,19 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
 
   const availableTopics = topicsData?.topics
     ? Object.keys(topicsData.topics)
-    : ["product_basics", "support_flow", "technical_concepts"]
+    : ["product_basics", "support_flow", "security_policy"]
+
+  useEffect(() => {
+    console.log("[v0] [TOPICS] Available topics:", availableTopics)
+    console.log("[v0] [TOPICS] Current topic:", topic)
+  }, [availableTopics, topic])
+
+  const formatTopicName = (topicValue: string) => {
+    return topicValue
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  }
 
   return (
     <div className="animate-fade-in space-y-8">
@@ -147,7 +165,18 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
               <label className="text-sm font-medium text-foreground">Topic</label>
               <Select value={topic} onValueChange={setTopic} disabled={topicsLoading}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue>
+                    {topicsLoading ? (
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading topics...
+                      </span>
+                    ) : topic ? (
+                      formatTopicName(topic)
+                    ) : (
+                      <span className="text-muted-foreground">Select a topic</span>
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {topicsLoading ? (
@@ -161,13 +190,14 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
                     <SelectItem value="error" disabled>
                       Error loading topics
                     </SelectItem>
+                  ) : availableTopics.length === 0 ? (
+                    <SelectItem value="no-topics" disabled>
+                      No topics available
+                    </SelectItem>
                   ) : (
                     availableTopics.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t
-                          .split("_")
-                          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                          .join(" ")}
+                        {formatTopicName(t)}
                         {topicsData?.topics[t] && ` (${topicsData.topics[t]} questions)`}
                       </SelectItem>
                     ))

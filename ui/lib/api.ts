@@ -1,6 +1,7 @@
 // API Service - Tüm backend çağrıları buradan yapılır
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API = `${API_BASE_URL}/api/v1`
 
 export interface Question {
   id?: string
@@ -98,6 +99,37 @@ export interface ChatResponse {
   response: string
 }
 
+export interface QuizStartResponse {
+  attempt_id: number
+  start_time: string
+}
+
+export interface QuizEndResponse {
+  attempt_id: number
+  total_duration_ms: number
+}
+
+export interface QuestionStartResponse {
+  timing_id: number
+  start_time: string
+}
+
+export interface QuestionEndResponse {
+  timing_id: number
+  duration_ms: number
+}
+
+export interface StartQuizAttemptPayload {
+  topic: string
+  difficulty: string
+  total_questions: number
+  start_time: string
+  mode?: string
+}
+
+
+
+
 const MOCK_QUESTIONS: Question[] = [
   {
     id: "1",
@@ -146,101 +178,47 @@ const MOCK_QUESTIONS: Question[] = [
 
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true"
 
+
+
 // Health check
 export async function checkHealth() {
-  if (USE_MOCK_DATA) {
-    return { status: "ok (mock)" }
-  }
-
-  const res = await fetch(`${API_BASE_URL}/health`)
+  const res = await fetch(`${API}/health`)
   if (!res.ok) throw new Error("API is not available")
   return res.json()
 }
 
 // Get available topics
-export async function getTopics(): Promise<TopicsResponse> {
-  if (USE_MOCK_DATA) {
-    return {
-      topics: {
-        React: 5,
-        JavaScript: 8,
-        "Web Development": 3,
-        TypeScript: 4,
-      },
-    }
-  }
-
-  const res = await fetch(`${API_BASE_URL}/topics`)
+export async function getTopics() {
+  const res = await fetch(`${API}/questions/topics`)
   if (!res.ok) throw new Error("Failed to fetch topics")
-  return res.json()
+  return res.json() as Promise<{ topics: Record<string, number> }>
 }
 
 // Generate quiz for a topic
-export async function generateQuiz(topic: string, level = "beginner", n = 5): Promise<QuizResponse> {
-  if (USE_MOCK_DATA) {
-    console.log("[v0] Using mock data for quiz generation")
-    return {
-      items: MOCK_QUESTIONS.slice(0, n),
-      shuffle: true,
-    }
-  }
-
-  console.log(
-    "[v0] Fetching quiz from:",
-    `${API_BASE_URL}/quiz?topic=${encodeURIComponent(topic)}&level=${level}&n=${n}`,
-  )
-
-  const controller = new AbortController()
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/quiz?topic=${encodeURIComponent(topic)}&level=${level}&n=${n}`, {
-      method: "POST",
-      signal: controller.signal,
-    })
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Unknown error")
-      console.error("[v0] API Error:", errorText)
-      throw new Error(`Failed to generate quiz: ${res.status} ${res.statusText}`)
-    }
-
-    return res.json()
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Soru üretimi iptal edildi.")
-    }
-    throw error
-  }
+export async function generateQuiz(topic: string, level = "beginner", n = 5, useOllama = false, qtype: string = "mcq") {
+  const res = await fetch(`${API}/quiz/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, level, n, use_ollama: useOllama, qtype }),
+  });
+  if (!res.ok) throw new Error(`Failed to generate quiz: ${res.status} ${res.statusText}`);
+  return res.json() as Promise<{ items: Question[]; shuffle: boolean }>;
 }
 
 // Get random question (for Daily Question)
-export async function getRandomQuestion(topic?: string, level?: string): Promise<Question> {
-  if (USE_MOCK_DATA) {
-    console.log("[v0] Using mock data for random question")
-    return MOCK_QUESTIONS[0]
-  }
-
+export async function getRandomQuestion(topic?: string, level?: string) {
   const params = new URLSearchParams()
   if (topic) params.append("topic", topic)
   if (level) params.append("level", level)
-
-  console.log("[v0] Fetching random question from:", `${API_BASE_URL}/questions/random?${params}`)
-
-  const res = await fetch(`${API_BASE_URL}/questions/random?${params}`)
-
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => "Unknown error")
-    console.error("[v0] API Error:", errorText)
-    throw new Error(`Failed to fetch random question: ${res.status} ${res.statusText}`)
-  }
-
-  return res.json()
+  const res = await fetch(`${API}/questions/random?${params}`)
+  if (!res.ok) throw new Error(`Failed to fetch random question: ${res.status} ${res.statusText}`)
+  return res.json() as Promise<Question>
 }
 
 // Generate a new question
 export async function generateQuestion(topic: string, level = "beginner", qtype = "mcq"): Promise<Question> {
   const res = await fetch(
-    `${API_BASE_URL}/questions/generate?topic=${encodeURIComponent(topic)}&level=${level}&qtype=${qtype}`,
+    `${API}/questions/generate?topic=${encodeURIComponent(topic)}&level=${level}&qtype=${qtype}`,
     { method: "POST" },
   )
   if (!res.ok) throw new Error("Failed to generate question")
@@ -248,88 +226,75 @@ export async function generateQuestion(topic: string, level = "beginner", qtype 
 }
 
 // Get all questions (for debugging)
-export async function getAllQuestions(): Promise<Question[]> {
-  const res = await fetch(`${API_BASE_URL}/questions/all`)
+export async function getAllQuestions() {
+  const res = await fetch(`${API}/questions?limit=1000`)
   if (!res.ok) throw new Error("Failed to fetch questions")
-  return res.json()
+  return res.json() as Promise<Question[]>
 }
 
 // Search in documents
 export async function searchDocuments(query: string) {
-  const res = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`)
+  const res = await fetch(`${API}/search?q=${encodeURIComponent(query)}`)
   if (!res.ok) throw new Error("Failed to search documents")
   return res.json()
 }
 
 // Get questions from DB
-export async function getQuestionsFromDB(topic: string, level: string, count: number): Promise<Question[]> {
-  if (USE_MOCK_DATA) {
-    console.log("[v0] Using mock data for questions")
-    return MOCK_QUESTIONS.slice(0, count)
+export async function getQuestionsFromDB(topic: string, level: string, count: number) {
+  const out: Question[] = []
+  const exclude: string[] = []
+  for (let i = 0; i < count; i++) {
+    const params = new URLSearchParams({ topic, level })
+    if (exclude.length) params.append("exclude", exclude.join(","))
+    const res = await fetch(`${API}/questions/random?${params}`)
+    if (!res.ok) throw new Error(`Failed to fetch question: ${res.status} ${res.statusText}`)
+    const q = (await res.json()) as Question
+    out.push(q)
+    if (q.id) exclude.push(String(q.id))
+    if (i < count - 1) await new Promise(r => setTimeout(r, 100)) // ritim
   }
-
-  console.log("[v0] Fetching questions from DB:", `${API_BASE_URL}/questions/random?topic=${topic}&level=${level}`)
-
-  // Birden fazla soru çekmek için random endpoint'i birden çok kez çağırıyoruz
-  const questionPromises = Array.from({ length: count }, () =>
-    fetch(`${API_BASE_URL}/questions/random?topic=${encodeURIComponent(topic)}&level=${level}`).then((res) => {
-      if (!res.ok) {
-        throw new Error(`Failed to fetch question: ${res.status} ${res.statusText}`)
-      }
-      return res.json()
-    }),
-  )
-
-  try {
-    const questions = await Promise.all(questionPromises)
-    return questions
-  } catch (error) {
-    console.error("[v0] Error fetching questions from DB:", error)
-    throw error
-  }
+  return out
 }
 
 // Login
 export async function login(username: string, password: string): Promise<LoginResponse> {
-  const formData = new FormData()
-  formData.append("username", username)
-  formData.append("password", password)
+  const body = new URLSearchParams();
+  body.append("username", username);
+  body.append("password", password);
 
-  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+  const res = await fetch(`${API}/auth/login`, {
     method: "POST",
-    body: formData,
-  })
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"},
+    body,
+  });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Giriş başarısız" }))
-    throw new Error(error.detail || "Kullanıcı adı veya şifre hatalı")
+    const error = await res.json().catch(() => ({ detail: "Giriş başarısız" }));
+    throw new Error(error.detail || "Kullanıcı adı veya şifre hatalı");
   }
 
-  return res.json()
+  return res.json();
 }
 
+
 // Register
-export async function register(username: string, email: string, password: string): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+export async function register(username: string, email: string, password: string) {
+  const res = await fetch(`${API}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, email, password }),
   })
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Kayıt başarısız" }))
-    throw new Error(error.detail || "Bu kullanıcı adı veya e-posta zaten kullanılıyor")
-  }
-
+  if (!res.ok) throw new Error("Bu kullanıcı adı veya e-posta zaten kullanılıyor")
   return res.json()
 }
 
 // Get user stats
 export async function getUserStats(token: string): Promise<UserStats> {
   console.log("[v0] getUserStats called")
-  console.log("[v0] API URL:", `${API_BASE_URL}/auth/stats`)
+  console.log("[v0] API URL:", `${API}/auth/stats`)
 
-  const res = await fetch(`${API_BASE_URL}/auth/stats`, {
+  const res = await fetch(`${API}/auth/stats`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -351,10 +316,10 @@ export async function getUserStats(token: string): Promise<UserStats> {
 // Submit quiz result
 export async function submitQuizResult(token: string, result: QuizResult): Promise<void> {
   console.log("[v0] submitQuizResult called")
-  console.log("[v0] API URL:", `${API_BASE_URL}/auth/submit-result`)
+  console.log("[v0] API URL:", `${API}/auth/submit-result`)
   console.log("[v0] Result data:", result)
 
-  const res = await fetch(`${API_BASE_URL}/auth/submit-result`, {
+  const res = await fetch(`${API}/auth/submit-result`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -377,7 +342,7 @@ export async function submitQuizResult(token: string, result: QuizResult): Promi
 
 // Generate random question (Admin only)
 export async function generateRandomQuestion(token: string): Promise<Question> {
-  const res = await fetch(`${API_BASE_URL}/admin/generate-random-question`, {
+  const res = await fetch(`${API}/admin/generate-random-question`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -393,33 +358,42 @@ export async function generateRandomQuestion(token: string): Promise<Question> {
 }
 
 // Generate question with parameters (Admin only)
-export async function generateQuestionWithParams(
-  token: string,
-  topic: string,
-  level: string,
-  qtype: string,
-): Promise<Question> {
-  const res = await fetch(
-    `${API_BASE_URL}/admin/generate-question?topic=${encodeURIComponent(topic)}&level=${level}&qtype=${qtype}`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+export async function generateQuestionWithParams(token: string, topic: string, level: string, qtype: string) {
+  const res = await fetch(`${API}/admin/generate-question?topic=${encodeURIComponent(topic)}&level=${level}&qtype=${qtype}`, {
+    method: "POST", headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Soru üretilemedi")
+  return res.json()
+}
+
+
+async function authPost<T>(url: string, token: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
-  )
+    body: JSON.stringify(body),
+  });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Soru üretilemedi" }))
-    throw new Error(error.detail || "Soru üretilemedi")
+    let info: any = null;
+    try {
+      info = await res.json();
+    } catch {
+      info = await res.text();
+    }
+    console.error("[API] POST failed", url, res.status, info);
+    throw new Error("Quiz başlatılamadı");
   }
 
-  return res.json()
+  return (await res.json()) as T;
 }
 
 // Delete question (Admin only)
 export async function deleteQuestion(token: string, questionId: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/admin/questions/${questionId}`, {
+  const res = await fetch(`${API}/admin/questions/${questionId}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -434,7 +408,7 @@ export async function deleteQuestion(token: string, questionId: string): Promise
 
 // Create first admin user (No auth required, only works if no admin exists)
 export async function createFirstAdmin(username: string, email: string, password: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/admin/create-first-admin`, {
+  const res = await fetch(`${API}/admin/create-first-admin`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -449,18 +423,9 @@ export async function createFirstAdmin(username: string, email: string, password
 }
 
 // Get all user activity (Admin only)
-export async function getUserActivity(token: string): Promise<QuizAttempt[]> {
-  const res = await fetch(`${API_BASE_URL}/admin/user-activity`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Kullanıcı aktivitesi yüklenemedi" }))
-    throw new Error(error.detail || "Kullanıcı aktivitesi yüklenemedi")
-  }
-
+export async function getUserActivity(token: string) {
+  const res = await fetch(`${API}/admin/user-activity`, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) throw new Error("Kullanıcı aktivitesi yüklenemedi")
   return res.json()
 }
 
@@ -476,7 +441,7 @@ export async function evaluateAnswer(
   console.log("[v0] Expected:", expected)
   console.log("[v0] User answer:", userAnswer)
 
-  const res = await fetch(`${API_BASE_URL}/evaluate-answer`, {
+  const res = await fetch(`${API}/evaluate-answer`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -493,7 +458,7 @@ export async function evaluateAnswer(
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => "Unknown error")
-    console.error("[v0] evaluateAnswer error:", errorText)
+    console.error("[v0] evaluateAnswer error response:", errorText)
     throw new Error("Cevap değerlendirilemedi")
   }
 
@@ -505,7 +470,7 @@ export async function evaluateAnswer(
 // Send chat message
 export async function sendChatMessage(token: string, message: string, context?: string): Promise<ChatResponse> {
   console.log("[v0] sendChatMessage called")
-  console.log("[v0] API URL:", `${API_BASE_URL}/chat`)
+  console.log("[v0] API URL:", `${API}/chat`)
   console.log("[v0] Message:", message)
   console.log("[v0] Context:", context)
 
@@ -522,7 +487,7 @@ export async function sendChatMessage(token: string, message: string, context?: 
   const timeoutId = setTimeout(() => controller.abort(), 120000) // 120 saniye timeout
 
   try {
-    const res = await fetch(`${API_BASE_URL}/chat`, {
+    const res = await fetch(`${API}/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -558,4 +523,63 @@ export async function sendChatMessage(token: string, message: string, context?: 
     console.error("[v0] sendChatMessage error:", error)
     throw error
   }
+}
+
+// Start quiz timing
+export async function startQuizTiming(
+  token: string,
+  payload: StartQuizAttemptPayload
+): Promise<{ attempt_id: number }> {
+  return authPost<{ attempt_id: number }>(
+    `${API_BASE_URL}/api/v1/quiz/attempt/start`,
+    token,
+    payload,
+  )
+}
+
+// End quiz timing
+export async function endQuizTiming(
+  token: string,
+  attemptId: number
+): Promise<{ success: boolean }> {
+  return authPost<{ success: boolean }>(
+    `${API_BASE_URL}/api/v1/quiz/attempt/end`,
+    token,
+    {
+      attempt_id: attemptId,
+    }
+  )
+}
+
+export interface StartQuestionTimingPayload {
+  attempt_id: number
+  question_id: string
+  client_start_time?: string
+}
+
+export interface EndQuestionTimingPayload {
+  timing_id: number
+  client_end_time?: string
+}
+
+export async function startQuestionTiming(
+  token: string,
+  payload: StartQuestionTimingPayload
+): Promise<{ timing_id: number }> {
+  return authPost<{ timing_id: number }>(
+    `${API_BASE_URL}/api/v1/quiz/question/start`,
+    token,
+    payload
+  )
+}
+
+export async function endQuestionTiming(
+  token: string,
+  payload: EndQuestionTimingPayload
+): Promise<{ success: boolean }> {
+  return authPost<{ success: boolean }>(
+    `${API_BASE_URL}/api/v1/quiz/question/end`,
+    token,
+    payload
+  )
 }

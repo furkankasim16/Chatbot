@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Fragment } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,16 +34,12 @@ export function UserActivityTable({ token }: UserActivityTableProps) {
   }, [attempts, searchQuery, topicFilter, difficultyFilter])
 
   const loadActivity = async () => {
-    console.log("[v0] Loading user activity...")
     setIsLoading(true)
     setError(null)
     try {
       const data = await getUserActivity(token)
-      console.log("[v0] User activity data received:", data)
-      console.log("[v0] Number of attempts:", data.length)
       setAttempts(data)
     } catch (error) {
-      console.error("[v0] Failed to load user activity:", error)
       setError(error instanceof Error ? error.message : "Veri yüklenirken hata oluştu")
     } finally {
       setIsLoading(false)
@@ -52,48 +48,30 @@ export function UserActivityTable({ token }: UserActivityTableProps) {
 
   const applyFilters = () => {
     let filtered = [...attempts]
-
-    // Search by username
     if (searchQuery) {
-      filtered = filtered.filter((attempt) => attempt.username.toLowerCase().includes(searchQuery.toLowerCase()))
+      filtered = filtered.filter((a) => a.username.toLowerCase().includes(searchQuery.toLowerCase()))
     }
-
-    // Filter by topic
-    if (topicFilter !== "all") {
-      filtered = filtered.filter((attempt) => attempt.topic === topicFilter)
-    }
-
-    // Filter by difficulty
-    if (difficultyFilter !== "all") {
-      filtered = filtered.filter((attempt) => attempt.difficulty === difficultyFilter)
-    }
-
+    if (topicFilter !== "all") filtered = filtered.filter((a) => a.topic === topicFilter)
+    if (difficultyFilter !== "all") filtered = filtered.filter((a) => a.difficulty === difficultyFilter)
     setFilteredAttempts(filtered)
   }
 
   const toggleRow = (id: number) => {
-    const newExpanded = new Set(expandedRows)
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id)
-    } else {
-      newExpanded.add(id)
-    }
-    setExpandedRows(newExpanded)
+    const next = new Set(expandedRows)
+    next.has(id) ? next.delete(id) : next.add(id)
+    setExpandedRows(next)
   }
 
-  const getUniqueTopics = () => {
-    return Array.from(new Set(attempts.map((a) => a.topic)))
-  }
+  const getUniqueTopics = () => Array.from(new Set(attempts.map((a) => a.topic)))
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("tr-TR", {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleString("tr-TR", {
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     })
-  }
 
   const getScoreColor = (percentage: number) => {
     if (percentage >= 80) return "text-green-600 dark:text-green-400"
@@ -158,9 +136,15 @@ export function UserActivityTable({ token }: UserActivityTableProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tüm Zorluklar</SelectItem>
-              <SelectItem value="beginner">Başlangıç</SelectItem>
-              <SelectItem value="intermediate">Orta</SelectItem>
-              <SelectItem value="advanced">İleri</SelectItem>
+              <SelectItem key="beginner" value="beginner">
+                Başlangıç
+              </SelectItem>
+              <SelectItem key="intermediate" value="intermediate">
+                Orta
+              </SelectItem>
+              <SelectItem key="advanced" value="advanced">
+                İleri
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -196,8 +180,8 @@ export function UserActivityTable({ token }: UserActivityTableProps) {
               </TableRow>
             ) : (
               filteredAttempts.map((attempt) => (
-                <>
-                  <TableRow key={attempt.id} className="cursor-pointer" onClick={() => toggleRow(attempt.id)}>
+                <Fragment key={attempt.id}>
+                  <TableRow className="cursor-pointer" onClick={() => toggleRow(attempt.id)}>
                     <TableCell>
                       <Button variant="ghost" size="icon" className="w-8 h-8">
                         {expandedRows.has(attempt.id) ? (
@@ -220,45 +204,49 @@ export function UserActivityTable({ token }: UserActivityTableProps) {
                   </TableRow>
 
                   {expandedRows.has(attempt.id) && (
-                    <TableRow>
+                    <TableRow key={`detail-${attempt.id}`}>
                       <TableCell colSpan={7} className="bg-muted/50">
                         <div className="p-4 space-y-3">
                           <h4 className="font-semibold text-sm">Soru Detayları</h4>
                           <div className="space-y-2">
-                            {attempt.questions_attempted.map((q, idx) => (
-                              <div
-                                key={idx}
-                                className={`p-3 rounded-lg border ${
-                                  q.is_correct
-                                    ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
-                                    : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900"
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1">
-                                    <p className="text-sm font-medium mb-1">Soru {idx + 1}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Kullanıcı Cevabı: <span className="font-medium">{q.user_answer || "Boş"}</span>
-                                    </p>
-                                  </div>
-                                  <div
-                                    className={`text-xs font-semibold px-2 py-1 rounded ${
-                                      q.is_correct
-                                        ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
-                                        : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
-                                    }`}
-                                  >
-                                    {q.is_correct ? "Doğru" : "Yanlış"}
+                            {attempt.questions_attempted.map((q, idx) => {
+                              const qKey = (q as any).id ?? (q as any).question_id ?? `${attempt.id}-${idx}`
+                              return (
+                                <div
+                                  key={qKey}
+                                  className={`p-3 rounded-lg border ${
+                                    q.is_correct
+                                      ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
+                                      : "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900"
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium mb-1">Soru {idx + 1}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Kullanıcı Cevabı:{" "}
+                                        <span className="font-medium">{q.user_answer || "Boş"}</span>
+                                      </p>
+                                    </div>
+                                    <div
+                                      className={`text-xs font-semibold px-2 py-1 rounded ${
+                                        q.is_correct
+                                          ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+                                          : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
+                                      }`}
+                                    >
+                                      {q.is_correct ? "Doğru" : "Yanlış"}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         </div>
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               ))
             )}
           </TableBody>

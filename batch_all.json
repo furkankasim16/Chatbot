@@ -1,0 +1,901 @@
+[
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Rotamen mobil uygulamasında sürücü, konum paylaşımı yapabilmek için hangi izni vermelidir?",
+    "choices": ["A) Kamera izni", "B) Konum erişim izni", "C) Depolama izni", "D) Bildirim izni"],
+    "answer_index": 1,
+    "rationale": "Teslimat ve rota takibi için cihazın konumuna erişim izni gereklidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Lucy planlama sisteminde 'Cutoff' kuralı neyi ifade eder?",
+    "choices": ["A) Gün içinde planlamanın otomatik çalıştığı zamanları", "B) Araçların depo çıkış saatlerini", "C) Sipariş onay ekranının kapanışını", "D) Planlamacının manuel onay zamanını"],
+    "answer_index": 0,
+    "rationale": "Cutoff, Lucy algoritmasının otomatik çalıştığı zaman dilimlerini belirleyen kuraldır."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS prensiplerine göre gizli bilgiler kimlerle paylaşılabilir?",
+    "choices": ["A) Herkesle, bilgi güncelse", "B) Yalnızca yöneticilerle", "C) Yetkili kişilerle veya yasal zorunluluk durumunda", "D) Sosyal medya üzerinden"],
+    "answer_index": 2,
+    "rationale": "Gizli bilgiler sadece görev gereği yetkili kişilerle veya yasal yükümlülük halinde paylaşılabilir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "beginner",
+    "stem": "Rotamen süreçlerinde 'Sefer Başlat' adımı ne zaman aktif hale gelir?",
+    "choices": ["A) Sürücü teslimata başladığında", "B) SAP'den 'İrsaliye Alındı' bilgisi geldiğinde", "C) Planlamacı manuel onay verdiğinde", "D) Gün sonu raporu tamamlandığında"],
+    "answer_index": 1,
+    "rationale": "SAP entegrasyonundan ‘İrsaliye Alındı’ bilgisi gelmeden Sefer Başlat butonu aktif olmaz."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy planlamasında 'Boşluk Değerlendirme' parametresi ne işe yarar?",
+    "choices": ["A) Araçlar arasında siparişlerin boş kapasiteye göre dengelenmesini sağlar", "B) Hatalı adresleri düzeltir", "C) Raporlama verilerini optimize eder", "D) Teslimat süresini tahmin eder"],
+    "answer_index": 0,
+    "rationale": "Bu parametre, araçların doluluk oranlarını optimize ederek siparişlerin dengeli dağılmasını sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS sosyal medya prensiplerine göre hangi durumda paylaşım yapılabilir?",
+    "choices": ["A) Onay alınmadan proje detayları paylaşılabilir", "B) Şirket içi bilgiler gizlilik şartıyla paylaşılabilir", "C) Yöneticiden onay alındıktan sonra paylaşım yapılabilir", "D) Her zaman paylaşım serbesttir"],
+    "answer_index": 2,
+    "rationale": "Şirket veya proje bilgileri sadece yöneticiden onay alınarak paylaşılabilir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Rotamen mobil uygulamasında 'Takas – Sipariş Devir İşlemi' özelliği ne sağlar?",
+    "choices": ["A) Sürücüler arasında sipariş aktarımı yapılmasını sağlar", "B) Siparişleri planlamacıya devreder", "C) Kalan siparişleri iptal eder", "D) Gün sonu işlemini başlatır"],
+    "answer_index": 0,
+    "rationale": "Takas modülü sürücüler arasında sipariş devri yapılmasını sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "beginner",
+    "stem": "Support flow içinde 'Offline Harita' özelliği ne işe yarar?",
+    "choices": ["A) İnternetsiz ortamda teslimat rotalarının görüntülenmesini sağlar", "B) Harita renklendirmelerini özelleştirir", "C) Sürücü hızını ölçer", "D) Raporlama yapar"],
+    "answer_index": 0,
+    "rationale": "Offline harita, internet bağlantısı olmasa bile rotaların görüntülenmesini sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy Hybrid Planlama modülünde 'Havuz Araç' fonksiyonu ne işe yarar?",
+    "choices": ["A) Yeni sürücü eklemek için kullanılır", "B) Birden fazla araçtan siparişleri birleştirip yeniden dağıtmayı sağlar", "C) Planlamayı manuel olarak durdurur", "D) Teslimat raporlarını siler"],
+    "answer_index": 1,
+    "rationale": "Havuz araç, siparişleri birleştirip uygun araçlara yeniden atamak için kullanılır."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "beginner",
+    "stem": "ONUSS prensiplerine göre bir çalışan etik ihlal fark ettiğinde ne yapmalıdır?",
+    "choices": ["A) Sessiz kalmalıdır", "B) Sosyal medyada duyurmalıdır", "C) Yöneticisine veya şirket sorumlusuna bildirmelidir", "D) Kendi çözmelidir"],
+    "answer_index": 2,
+    "rationale": "Etik ihlaller yöneticilere veya ilgili sorumlu kişilere gizlilikle bildirilmelidir."
+  },{
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Lucy planlamasında 'Stage Bar' hangi amaçla kullanılır?",
+    "choices": ["A) Planlama sonrası raporlamayı durdurur", "B) Planlama adımlarının etkilerini zamana göre izlemeyi sağlar", "C) Manuel sıralamayı devre dışı bırakır", "D) Barkod okutma sürelerini gösterir"],
+    "answer_index": 1,
+    "rationale": "Stage Bar, planlama sürecinde yapılan değişikliklerin zaman, kilometre ve uğrama sayısına etkisini izlemek için kullanılır."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Mobil uygulamada 'Gördüm' butonuna basıldığında ne onaylanır?",
+    "choices": ["A) Sefer başlangıcı", "B) İş listesinin görüldüğü ve planlayıcıya bildirildiği", "C) Siparişin teslim edildiği", "D) Gün sonu işlemi yapıldığı"],
+    "answer_index": 1,
+    "rationale": "Gördüm seçeneği, sürücünün iş listesini mobil cihazında görüntülediğini planlamacıya iletir."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS gizlilik prensiplerine göre hangi davranış gizlilik ihlali sayılır?",
+    "choices": ["A) Şirket stratejisini sosyal medyada paylaşmak", "B) Yetkilendirilmiş kişilere bilgi aktarmak", "C) Şifreleri güvenli platformlarda saklamak", "D) E-posta imzasına şirket adresini eklemek"],
+    "answer_index": 0,
+    "rationale": "Şirketin stratejik planlarını veya projelerini sosyal medyada paylaşmak açık bir gizlilik ihlalidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "beginner",
+    "stem": "Rotamen süreçlerinde 'Kalan İşlerimi Yetiştiremedim' özelliği ne sağlar?",
+    "choices": ["A) Teslim edilemeyen siparişleri toplu olarak olumsuz kapatmayı sağlar", "B) Siparişleri otomatik onaylar", "C) Yeni sipariş oluşturur", "D) Gün sonu işlemini atlar"],
+    "answer_index": 0,
+    "rationale": "Bu özellik, teslim edilemeyen siparişleri gün sonunda toplu olarak olumsuz kapatmayı sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "advanced",
+    "stem": "Avansas Planlama Yetkilisi panelinde 'Uyarı Raporları' hangi durumlarda kullanılır?",
+    "choices": ["A) Sefer performans analizinde", "B) Eksik barkod veya hatalı adres atamalarında", "C) Satış hedefi takibinde", "D) Kullanıcı parolası sıfırlamada"],
+    "answer_index": 1,
+    "rationale": "Uyarı raporları, eksik veya hatalı verilerin tespitinde planlamacılara bildirim sağlayan araçlardır."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS Çalışma Prensipleri'ne göre çıkar çatışması nasıl tanımlanır?",
+    "choices": ["A) Çalışan ile müşteri arasında anlaşmazlık yaşanması", "B) Kişisel çıkarların şirket çıkarlarıyla çakışması", "C) Müşteri memnuniyetinin azalması", "D) Görev değişikliğinin yapılması"],
+    "answer_index": 1,
+    "rationale": "Çıkar çatışması, bir çalışanın kişisel çıkarlarının ONUSS'un çıkarlarıyla çakışması durumudur."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy Hybrid planlamasında 'Transport Öğrenimi' özelliği ne işe yarar?",
+    "choices": ["A) Araç sürüş verilerini analiz eder", "B) Önceki senaryolardan öğrenerek daha iyi planlama sonuçları üretir", "C) Barkod hatalarını düzeltir", "D) Sefer sırasını otomatik değiştirir"],
+    "answer_index": 1,
+    "rationale": "Transport Öğrenimi, önceki planlama senaryolarından elde edilen verilerle yapay zekâ modelini geliştirmeye yarar."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Mobil uygulamada adres skorları neyi gösterir?",
+    "choices": ["A) Teslimat süresini", "B) Adresin doğruluk seviyesini (kırmızı, turuncu, yeşil)", "C) Araç kapasitesini", "D) Müşteri puanlamasını"],
+    "answer_index": 1,
+    "rationale": "Adres skorları, adresin doğruluk seviyesini renklerle (yeşil-tam, turuncu-kısmi, kırmızı-düşük) gösterir."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "beginner",
+    "stem": "ONUSS Çalışma Prensipleri'ne göre bir stajyerin temel yükümlülüklerinden biri nedir?",
+    "choices": ["A) Proje kodlarını paylaşmak", "B) Gizlilik kurallarına uymak", "C) Raporları dış paydaşlara göndermek", "D) İş arkadaşlarını değerlendirmek"],
+    "answer_index": 1,
+    "rationale": "Stajyerler de diğer çalışanlar gibi gizlilik ve bilgi güvenliği prensiplerine uymakla yükümlüdür."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Rotamen operasyonunda 'Lecy' arayüzü hangi amaçla kullanılır?",
+    "choices": ["A) Mobil cihaz güncellemelerini yapmak", "B) Canlı teslimat ve fotoğraf kanıtlarını izlemek", "C) Depo planlaması oluşturmak", "D) Müşteri sözleşmesi hazırlamak"],
+    "answer_index": 1,
+    "rationale": "Lecy arayüzü, canlı teslimat sürecini ve fotoğraf gibi kanıtların görüntülenmesini sağlar."
+  },
+   {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy planlamasında iki sürücülü takometre parametresi ne işe yarar?",
+    "choices": ["A) Sürücü performans puanlamasını hesaplar", "B) Sürüş ve mola sürelerini optimize eder", "C) Yalnızca yakıt tüketimini ölçer", "D) Navigasyon hatalarını azaltır"],
+    "answer_index": 1,
+    "rationale": "İki sürücülü takometre, mola ve sürüş sürelerinin yasal limitlere uygun şekilde planlanmasını sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Mobil uygulamada 'İrsaliye' statüsü neyi ifade eder?",
+    "choices": ["A) Seferin başladığını", "B) Yüklemenin tamamlandığını ve irsaliye kesildiğini", "C) Siparişin iptal edildiğini", "D) Gün sonunun tamamlandığını"],
+    "answer_index": 1,
+    "rationale": "İrsaliye statüsü, yükleme tamamlandığında ve SAP üzerinden irsaliye kesildiğinde oluşur."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS prensiplerine göre rüşvet veya komisyon teklif edilirse çalışan ne yapmalıdır?",
+    "choices": ["A) Teklifi kabul edip raporlamalıdır", "B) Reddetmeli ve yöneticisine bildirmelidir", "C) Gizlice kabul etmelidir", "D) Konuyu görmezden gelmelidir"],
+    "answer_index": 1,
+    "rationale": "Rüşvet veya komisyon teklifleri reddedilmeli ve olay yöneticilere bildirilmelidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Rotamen Dashboard'da 'Ortalama Geofence' metriği neyi gösterir?",
+    "choices": ["A) Teslimat alanlarının kapsama oranını", "B) Kullanıcıların GPS doğruluğunu", "C) Barkod okutma hızını", "D) Araç yakıt tüketimini"],
+    "answer_index": 0,
+    "rationale": "Ortalama Geofence, teslimat alanlarının doğru kapsanma oranını temsil eder."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS'un sosyal medya politikası hangi temel prensibe dayanır?",
+    "choices": ["A) Şirket bilgilerinin sınırsız paylaşımı", "B) Kişisel hesaplarda yalnızca bireysel görüşlerin belirtilmesi", "C) Kurum adına serbest açıklama yapılması", "D) Yöneticisiz paylaşım özgürlüğü"],
+    "answer_index": 1,
+    "rationale": "ONUSS, çalışanların bireysel görüş belirtirken şirketi temsil etmemesini ve profesyonel dil kullanmasını ister."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "beginner",
+    "stem": "Rotamen mobil uygulamasında 'Rampaya Çağrılmayı Bekleyiniz' ekranı neyi ifade eder?",
+    "choices": ["A) Yükleme sırasının planlayıcı tarafından belirlenmesini", "B) Sürücünün teslimat başlattığını", "C) Gün sonunun geldiğini", "D) Aracın bakımda olduğunu"],
+    "answer_index": 0,
+    "rationale": "Bu ekran, planlamacı tarafından aracın yükleme rampasına çağrılmasını bekleme aşamasını gösterir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Teslimat ekranında barkod okutulamıyorsa hangi işlem yapılmalıdır?",
+    "choices": ["A) Barkod numarası manuel girilmelidir", "B) Teslimat iptal edilmelidir", "C) Planlamacıya bildirim gönderilmelidir", "D) Gün sonu yapılmalıdır"],
+    "answer_index": 0,
+    "rationale": "Kamera okunamazsa barkod numarası manuel olarak girilebilir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy algoritmasının 'Günlük Rut' parametresi neyi optimize eder?",
+    "choices": ["A) Günlük araç sayısını artırırken toplam kilometreyi minimize etmeyi", "B) Planlamayı durdurmayı", "C) Kayıtlı sürücü bilgilerini silmeyi", "D) Raporları gizlemeyi"],
+    "answer_index": 0,
+    "rationale": "Günlük Rut, araç sayısını artırarak günlük operasyonun optimum kapasitede çalışmasını sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "beginner",
+    "stem": "ONUSS’un çeşitlilik politikası hangi ilkeye dayanır?",
+    "choices": ["A) Herkesin eşit muamele görmesi", "B) Yalnızca kıdemli çalışanların terfi etmesi", "C) Ulusal kökene göre sınıflandırma", "D) Yaşa göre iş bölümü"],
+    "answer_index": 0,
+    "rationale": "Çeşitlilik politikası, tüm çalışanların eşit fırsat ve saygı temelinde değerlendirilmesini esas alır."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Rotamen sisteminde 'Tracking Link' ne işe yarar?",
+    "choices": ["A) Müşterinin siparişini canlı olarak izleyebilmesini sağlar", "B) Barkodları toplu indirir", "C) Araç yakıt raporu oluşturur", "D) Planlama dosyasını indirir"],
+    "answer_index": 0,
+    "rationale": "Tracking Link, müşteriye gönderilen SMS ile siparişin canlı olarak izlenmesini sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Mobil uygulamada 'Gün Sonu' işlemi neyi ifade eder?",
+    "choices": ["A) Seferin başladığını", "B) Tüm teslimatların tamamlandığını ve seferin kapatıldığını", "C) Yükleme sırasının planlandığını", "D) Planlamacının onay verdiğini"],
+    "answer_index": 1,
+    "rationale": "Gün Sonu işlemi, sürücünün seferi bitirdiğini ve teslim edilmeyen siparişlerin kontrol edildiğini bildirir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Lucy planlamasında 'Widget Bilgi Paneli' ne işe yarar?",
+    "choices": ["A) Planlama parametrelerini değiştirmek", "B) Toplam araç, KM, palet ve uğrama bilgilerini özetlemek", "C) Harita renklerini düzenlemek", "D) Barkod okutma verilerini temizlemek"],
+    "answer_index": 1,
+    "rationale": "Widget paneli, planlama sonuçlarının özetini göstererek araç, KM, palet ve uğrama sayılarını listeler."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS prensiplerine göre gizli belgelerin saklanmasında hangisi doğrudur?",
+    "choices": ["A) Bilgiler yalnızca yazılı olarak saklanmalıdır", "B) Bilgiler yetkili erişimi olan kişilerce güvenli şekilde korunmalıdır", "C) Herkesin erişimine açık klasörlerde tutulabilir", "D) Bulut ortamında şifrelenmeden paylaşılabilir"],
+    "answer_index": 1,
+    "rationale": "Gizli bilgiler sadece yetkili kişilerce erişilebilecek güvenli ortamlarda saklanmalıdır."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy planlamasında 'Kilitli Araç' neyi gösterir?",
+    "choices": ["A) Hatalı planlama yapılmış araç", "B) Onaylanmış ve yeniden planlanmayacak araç", "C) Henüz yüklenmemiş araç", "D) İptal edilmiş araç"],
+    "answer_index": 1,
+    "rationale": "Kilitli araç, planlamacının onayladığı ve sonraki Lucy çalıştırmalarında değişmeyecek araçtır."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS sosyal medya kurallarına göre çalışan, iş yerinden hangi bilgileri paylaşmamalıdır?",
+    "choices": ["A) Genel motivasyon mesajlarını", "B) Toplantı detaylarını, proje bilgilerini ve müşteri isimlerini", "C) Şirket logosunu", "D) Kendi başarı hikayelerini"],
+    "answer_index": 1,
+    "rationale": "Toplantı, proje ve müşteri detaylarının paylaşılması gizlilik ihlalidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Planlama yetkilisi ekranında 'Raporlar' bölümü hangi amaca hizmet eder?",
+    "choices": ["A) Yalnızca araç konumlarını göstermek", "B) Teslimat verilerini analiz etmek ve geçmişe dönük performans ölçmek", "C) Yeni sürücü eklemek", "D) Barkod sistemini sıfırlamak"],
+    "answer_index": 1,
+    "rationale": "Raporlar, teslimat ve operasyon performansını analiz etmek için kullanılır."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "beginner",
+    "stem": "Rotamen sisteminde 'Tracking' bağlantısı hangi kullanıcıya gönderilir?",
+    "choices": ["A) Depo yöneticisine", "B) Sürücüye", "C) Müşteriye", "D) Planlamacıya"],
+    "answer_index": 2,
+    "rationale": "Tracking bağlantısı, müşterinin siparişini canlı olarak izleyebilmesi için SMS ile gönderilir."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS prensiplerine göre bir çalışan gizli bilgiyi yanlışlıkla dışarı sızdırırsa ne yapmalıdır?",
+    "choices": ["A) Durumu gizlemelidir", "B) Sosyal medyada açıklama yapmalıdır", "C) Derhal yöneticisine veya bilgi güvenliği sorumlusuna bildirmelidir", "D) Veriyi silip sessiz kalmalıdır"],
+    "answer_index": 2,
+    "rationale": "Yanlışlıkla yapılan veri sızıntıları hemen yönetime ve güvenlik ekibine bildirilmelidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Mobil uygulamada 'Otomatik Sıralama' fonksiyonu ne sağlar?",
+    "choices": ["A) Teslimat noktalarının en verimli sırayla düzenlenmesini", "B) Barkodları sıralar", "C) Araç listelerini günceller", "D) Gün sonunu kapatır"],
+    "answer_index": 0,
+    "rationale": "Otomatik Sıralama, teslimat rotasını konum veya depo uzaklığına göre optimize eder."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Lucy planlamasında 'Raporu İndir' fonksiyonu ne işe yarar?",
+    "choices": ["A) Planlama sonuçlarını robot sistemine aktarmak için rapor oluşturur", "B) Barkod listesini indirir", "C) Gün sonu raporlarını siler", "D) Sürücü notlarını düzenler"],
+    "answer_index": 0,
+    "rationale": "Bu fonksiyon, planlama sonuçlarının robot sistemine aktarımı için gerekli planlamacı raporunu oluşturur."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "beginner",
+    "stem": "ONUSS stajyerlik kurallarına göre sosyal medya paylaşımlarında hangi ifade kullanılmalıdır?",
+    "choices": ["A) Şirket adına konuşuyorum", "B) Bu fikir yalnızca beni temsil eder", "C) ONUSS’un resmi görüşüdür", "D) Hiçbir açıklama gerekmez"],
+    "answer_index": 1,
+    "rationale": "ONUSS, kişisel paylaşımlarda görüşlerin yalnızca kişiyi temsil ettiğini açıkça belirtmeyi şart koşar."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Rotamen mobil uygulamasında 'Adres Öğren' özelliği ne işe yarar?",
+    "choices": ["A) Yanlış adresi sürükle-bırak yöntemiyle düzeltmeyi sağlar", "B) Yeni müşteri ekler", "C) Barkod okutmayı başlatır", "D) Navigasyonu kapatır"],
+    "answer_index": 0,
+    "rationale": "Adres Öğren özelliği, sürücünün harita üzerinde doğru konumu işaretleyerek sistemin adresi öğrenmesini sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy planlamasında 'Günlük Rut' parametresi açık olduğunda ne etkilenir?",
+    "choices": ["A) Araç sayısı ve toplam kilometre optimizasyonu", "B) Barkod sıralaması", "C) Depo stok seviyesi", "D) Planlamacı rol yetkileri"],
+    "answer_index": 0,
+    "rationale": "Günlük Rut, araç sayısını optimize ederken toplam kilometreyi de dengeleyen bir parametredir."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS’un 'Çıkar Çatışması' politikası neyi önlemeyi amaçlar?",
+    "choices": ["A) Müşteri kaybını", "B) Kişisel menfaatlerin şirket çıkarlarını etkilemesini", "C) Zaman kaybını", "D) İzin ihlallerini"],
+    "answer_index": 1,
+    "rationale": "Politika, çalışanların kişisel çıkarlarının ONUSS’un kararlarını etkilemesini önler."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "advanced",
+    "stem": "Planlama Yetkilisi Dokümanı’na göre 'LucyGo' ve 'LecyGo' farkı nedir?",
+    "choices": ["A) LucyGo planlama içindir, LecyGo operasyon ve takip içindir", "B) LucyGo raporlama, LecyGo veri girişi yapar", "C) LucyGo mobil, LecyGo masaüstüdür", "D) Aralarında fark yoktur"],
+    "answer_index": 0,
+    "rationale": "LucyGo planlama fonksiyonlarını yönetirken LecyGo saha operasyonlarının takibini sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "beginner",
+    "stem": "Rotamen sisteminde 'Zone Ayarları' neyi düzenler?",
+    "choices": ["A) Araç yakıt tüketimini", "B) Xdock, Subzone ve Rack tanımlarını", "C) Barkod numaralarını", "D) Müşteri anketlerini"],
+    "answer_index": 1,
+    "rationale": "Zone Ayarları, Xdock, Subzone ve Rack yapılarını düzenleyen yönetim ekranıdır."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS prensiplerine göre çalışanların kişisel verileri nasıl işlenmelidir?",
+    "choices": ["A) Gizlilik yasalarına uygun şekilde, yalnızca iş amacıyla", "B) İsteyen herkes erişebilir", "C) Sosyal medya paylaşımı serbesttir", "D) Üçüncü kişilerle serbestçe paylaşılabilir"],
+    "answer_index": 0,
+    "rationale": "Kişisel veriler yalnızca yasal gereklilik ve iş gereği işlenebilir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Lucy planlamasında 'Yenile (Ctrl+R)' komutu ne işe yarar?",
+    "choices": ["A) KM ve değişiklikleri günceller", "B) Planlamayı sıfırlar", "C) Raporları siler", "D) Haritayı kapatır"],
+    "answer_index": 0,
+    "rationale": "Yenile komutu, yapılan değişikliklerin toplam KM’ye etkisini anında günceller."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Rotamen mobil uygulamasında 'Depoya Gidiyorum / Geldim' aşaması neyi bildirir?",
+    "choices": ["A) Araç bakım sürecini", "B) Sürücünün depoya ulaşım durumunu", "C) Barkod okutma işlemini", "D) Gün sonu kapanışını"],
+    "answer_index": 1,
+    "rationale": "Bu aşama, sürücünün depoya gidiş ve varış bilgilerini sistemde günceller."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy algoritmasında 'Transport Veri Öğrenimi' aktifse sistem nasıl davranır?",
+    "choices": ["A) Önceki planlama senaryolarını analiz ederek gelecekte daha iyi öneriler sunar", "B) Manuel planlamayı kapatır", "C) Tüm araçları yeniden sıralar", "D) Sadece palet miktarlarını değiştirir"],
+    "answer_index": 0,
+    "rationale": "Bu özellik, geçmiş verilerden öğrenerek yeni planlamalarda optimizasyon sağlar."
+  },
+   {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Rotamen mobil uygulamasında 'Teslimata Gidiyorum' seçeneği neyi ifade eder?",
+    "choices": ["A) Sürücünün yola çıktığını bildirir", "B) Teslimatın iptal edildiğini", "C) Gün sonunun başlatıldığını", "D) Yeni müşteri eklendiğini"],
+    "answer_index": 0,
+    "rationale": "Bu seçenek, sürücünün belirli bir teslimat noktasına gitmek üzere yola çıktığını belirtir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "SAP–Rotamen entegrasyonunda teslimat statülerinin eşleşmesi hangi aşamada gerçekleşir?",
+    "choices": ["A) Sefer Başlat sonrası", "B) Yükleme tamamlandığında", "C) Gün sonu onayında", "D) Planlama bitiminde"],
+    "answer_index": 0,
+    "rationale": "Teslimat statüleri, Sefer Başlat sonrası SAP ve Rotamen arasında senkronize edilir."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS'un 'Karşılık Verme Yasağı' prensibi neyi garanti eder?",
+    "choices": ["A) Şikayette bulunan çalışanlara karşı misilleme yapılmamasını", "B) Gizli bilgilerin paylaşılmasını", "C) Tüm raporların kamuya açıklanmasını", "D) Şirket içi eleştirilerin yasaklanmasını"],
+    "answer_index": 0,
+    "rationale": "Bu prensip, ihlalleri bildiren çalışanların hiçbir şekilde cezalandırılmamasını sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "advanced",
+    "stem": "Mobil uygulamada 'Kısmi Teslimat' hangi durumu ifade eder?",
+    "choices": ["A) Teslimat tamamen başarısız olmuştur", "B) Siparişin bir kısmı olumlu, bir kısmı olumsuz teslim edilmiştir", "C) Teslimat tekrar planlanmıştır", "D) Sipariş iptal edilmiştir"],
+    "answer_index": 1,
+    "rationale": "Kısmi teslimat, aynı sipariş içinde hem teslim edilen hem de teslim edilemeyen ürünlerin bulunduğu durumu ifade eder."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Rotamen dashboard'da 'Drop Limit Altı-Üstü' metriği neyi gösterir?",
+    "choices": ["A) Teslimat sürelerini", "B) Araç başına düşen ortalama teslimat sayısının hedef altında veya üstünde olmasını", "C) Sürücü performans skorunu", "D) Planlama hatalarını"],
+    "answer_index": 1,
+    "rationale": "Drop Limit Altı-Üstü, araçların teslimat adetlerinin belirlenen operasyon limitine göre analizini sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "beginner",
+    "stem": "ONUSS prensiplerine göre hediyeler hangi durumda kabul edilebilir?",
+    "choices": ["A) Her zaman", "B) Sembolik ve iş ilişkisine uygun olduğunda", "C) Para içeriyorsa", "D) Gizli bir anlaşma karşılığında"],
+    "answer_index": 1,
+    "rationale": "Yalnızca sembolik değerde ve iş ilişkisine uygun hediyeler kabul edilebilir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Mobil uygulamada 'Olumsuz Teslimat' neden raporlanır?",
+    "choices": ["A) Raporlama amacıyla", "B) Teslimatın gerçekleşmediği durumlarda gerekçelerin kayıt altına alınması için", "C) Barkod okutulmadığında", "D) Gün sonu kapatıldığında"],
+    "answer_index": 1,
+    "rationale": "Olumsuz teslimat, başarısız teslimatların nedenlerinin sistemde kayıt altına alınması için kullanılır."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy planlamasında 'Havuzdan Sipariş Atama' işlemi ne yapar?",
+    "choices": ["A) Yeni sipariş oluşturur", "B) Havuzdaki siparişleri uygun araçlara yeniden atar", "C) Siparişleri siler", "D) Teslimat geçmişini sıfırlar"],
+    "answer_index": 1,
+    "rationale": "Havuzdan sipariş atama, birleştirilen siparişleri yeniden uygun araçlara atamak için kullanılır."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS prensiplerine göre telif hakkı ihlali hangi durumda oluşur?",
+    "choices": ["A) Yazılı izin olmadan yazılım veya belge kopyalanırsa", "B) Kendi yazılımınızı geliştirirken başka kaynaklardan ilham alınırsa", "C) Şirket içinde paylaşım yapılırsa", "D) Yazılım kullanımı eğitim amaçlıysa"],
+    "answer_index": 0,
+    "rationale": "Yazılı izin olmadan üçüncü taraf yazılım veya belgelerin kopyalanması telif hakkı ihlalidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Mobil uygulamada 'Geldim' butonu hangi bilgiyi iletir?",
+    "choices": ["A) Sürücü teslimat noktasına ulaştı bilgisini", "B) Teslimat iptalini", "C) Barkod okutma hatasını", "D) Yeni rota talebini"],
+    "answer_index": 0,
+    "rationale": "Geldim butonu, sürücünün teslimat noktasına ulaştığını sisteme bildirir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Lucy planlamasında 'Akordiyon Görünümü' hangi bilgileri gösterir?",
+    "choices": ["A) Araç bakım geçmişini", "B) Depo çıkış ve tahmini varış saatlerini", "C) Teslimat faturalarını", "D) Müşteri anketlerini"],
+    "answer_index": 1,
+    "rationale": "Akordiyon görünümü, araçların depo çıkış ve bayi varış zamanlarını ayrıntılı biçimde gösterir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "advanced",
+    "stem": "Planlama yetkilisi, sistem parametrelerinde 'SMS içerik düzenleme' fonksiyonunu neden kullanır?",
+    "choices": ["A) Sürücüye gönderilen mesajların içeriğini özelleştirmek için", "B) Teslimat raporlarını silmek için", "C) Barkod sırasını düzenlemek için", "D) Planlamayı durdurmak için"],
+    "answer_index": 0,
+    "rationale": "Bu fonksiyon, müşterilere gönderilen SMS içeriklerinin kişiselleştirilmesini sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS politikalarına göre kişisel bilgiler hangi durumda paylaşılabilir?",
+    "choices": ["A) Pazarlama amacıyla", "B) Yalnızca yasal veya operasyonel gereklilik halinde", "C) Sosyal medya üzerinde", "D) Dış tedarikçilere serbestçe"],
+    "answer_index": 1,
+    "rationale": "Kişisel bilgiler yalnızca yasal veya operasyonel gereklilik durumlarında paylaşılabilir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy algoritmasında 'SLA Uyum' metriği neyi ifade eder?",
+    "choices": ["A) Sürücü memnuniyet oranını", "B) Teslimat sürelerinin hizmet düzeyi anlaşmalarına uygunluğunu", "C) Palet kapasitesini", "D) Yakıt tüketimini"],
+    "answer_index": 1,
+    "rationale": "SLA Uyum metriği, planlanan teslimatların belirlenen zaman hedeflerine uygunluğunu ölçer."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Mobil uygulamada barkod okutulduğunda ürünün varsayılan durumu nedir?",
+    "choices": ["A) Teslim edilmedi", "B) Teslim edildi", "C) Beklemede", "D) İptal edildi"],
+    "answer_index": 1,
+    "rationale": "Barkod okutulduğunda ürün durumu otomatik olarak 'Teslim Edildi' olarak işaretlenir."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS prensiplerine göre şirket mallarının uygunsuz kullanımı hangi duruma örnektir?",
+    "choices": ["A) Ofis kaynaklarını kişisel kazanç için kullanmak", "B) İş için şirket bilgisayarını kullanmak", "C) Ekip toplantılarını kaydetmek", "D) Şirket içi doküman hazırlamak"],
+    "answer_index": 0,
+    "rationale": "Şirket kaynaklarını kişisel amaçlarla kullanmak uygunsuz kullanıma örnektir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Lucy planlamasında 'Tır Güzergah Bölgesi' neyi tanımlar?",
+    "choices": ["A) Tırın duracağı park noktalarını", "B) Uğradığı bayilere göre alt bölge isimlendirmesini", "C) Şehir sınırlarını", "D) Rota dışı alanları"],
+    "answer_index": 1,
+    "rationale": "Bu alan, tırın uğradığı bayiler doğrultusunda belirlenen alt bölge isimlendirmesidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "beginner",
+    "stem": "ONUSS prensiplerine göre güvenli çalışma ortamının sağlanmasında çalışanların sorumluluğu nedir?",
+    "choices": ["A) Güvensiz durumları bildirmek", "B) Yalnızca yöneticilerin kontrolüne bırakmak", "C) Göz ardı etmek", "D) Kendi alanında önlem almamak"],
+    "answer_index": 0,
+    "rationale": "Her çalışan, güvenli ortamın korunması için tehlikeli durumları derhal bildirmelidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "beginner",
+    "stem": "Rotamen sisteminde 'Müşteri Deneyimi - Temassız Teslimat' ne sağlar?",
+    "choices": ["A) Teslimatın fotoğrafla teyit edilmesini", "B) Müşteriyle fiziksel temas kurmadan teslimat yapılmasını", "C) SMS gönderiminin iptalini", "D) Kargo iptalini"],
+    "answer_index": 1,
+    "rationale": "Temassız teslimat, güvenli şekilde fiziksel temas olmadan teslimat yapılmasını sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "advanced",
+    "stem": "Rotamen Planlama Dokümanı’na göre 'Uyarı Yönetimi' hangi fonksiyona hizmet eder?",
+    "choices": ["A) Operasyon hatalarının erken tespit edilmesine", "B) Gün sonu onaylarını otomatikleştirmeye", "C) Mobil cihazları senkronize etmeye", "D) Barkod hatalarını gizlemeye"],
+    "answer_index": 0,
+    "rationale": "Uyarı Yönetimi, hatalı veya eksik işlemleri erken fark ederek planlamacıyı bilgilendirir."
+  },
+   {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Rotamen mobil uygulamasında 'Onayla' ekranı ne işe yarar?",
+    "choices": ["A) İş listesinin sıralamasını kontrol edip onaylamayı sağlar", "B) Gün sonunu kapatır", "C) Yeni sefer oluşturur", "D) Barkodları toplu siler"],
+    "answer_index": 0,
+    "rationale": "Onayla ekranı, sürücünün teslimat sırasını kontrol etmesini ve onaylamasını sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Lucy planlamasında 'Transport Veri Öğrenimi' kapalıysa ne olur?",
+    "choices": ["A) Planlama geçmiş verileri dikkate alınmaz", "B) Manuel müdahaleler engellenir", "C) Tüm rotalar otomatik kilitlenir", "D) Teslimat raporları kapanır"],
+    "answer_index": 0,
+    "rationale": "Transport Öğrenimi kapalı olduğunda sistem geçmiş planlama verilerini kullanmadan plan oluşturur."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS prensiplerine göre uluslararası işlerde hangi gereklilik öne çıkar?",
+    "choices": ["A) Rekabet yasalarına ve ihracat kontrol yönetmeliklerine tam uyum", "B) Her ülkenin yasalarına uyulmaması", "C) Kârın maksimize edilmesi", "D) Gizli bilgilerin paylaşılması"],
+    "answer_index": 0,
+    "rationale": "ONUSS, uluslararası işlerde yasalara ve ticaret düzenlemelerine tam uyumu zorunlu kılar."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "advanced",
+    "stem": "Planlama ekranında 'Ortalama Teslimat Süresi' metriği hangi bilgiye dayanır?",
+    "choices": ["A) Tüm seferlerin ortalama sürelerine", "B) Sadece son teslimata", "C) En kısa rotaya", "D) Yalnızca planlanan araçlara"],
+    "answer_index": 0,
+    "rationale": "Bu metrik, tamamlanan seferlerdeki ortalama teslimat sürelerinin ölçümüne dayanır."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "beginner",
+    "stem": "ONUSS sosyal medya prensiplerine göre hangi davranış doğrudur?",
+    "choices": ["A) Şirket projelerini paylaşmak", "B) Siyasi tartışmalara şirket adıyla katılmak", "C) Kişisel görüşlerde profesyonel dil kullanmak", "D) Gizli bilgileri paylaşmak"],
+    "answer_index": 2,
+    "rationale": "ONUSS çalışanları, sosyal medyada profesyonel ve saygılı bir dil kullanmalıdır."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy planlamasında 'Boşluk Planlaması' neden önemlidir?",
+    "choices": ["A) Araç doluluk oranlarını optimize eder", "B) Raporları azaltır", "C) Teslimat süresini kısaltır", "D) Barkodları sıralar"],
+    "answer_index": 0,
+    "rationale": "Boşluk Planlaması, araçların kapasite kullanımını dengeli hale getirir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Mobil uygulamada 'İş Listesi' ekranında mor renkli sipariş neyi gösterir?",
+    "choices": ["A) Takas ile gelen siparişleri", "B) Teslim edilmemiş siparişleri", "C) Reddedilen siparişleri", "D) Gün sonu siparişlerini"],
+    "answer_index": 0,
+    "rationale": "Mor renk, başka bir sürücüden takasla gelen siparişleri temsil eder."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS prensiplerine göre 'adil rekabet' ilkesi neden önemlidir?",
+    "choices": ["A) Şirket içi motivasyonu artırır", "B) Piyasa itibarını korur ve yasal riskleri önler", "C) Satışları doğrudan artırır", "D) Gizlilik gerekliliklerini kaldırır"],
+    "answer_index": 1,
+    "rationale": "Adil rekabet ilkesi, dürüst ticaret anlayışını destekler ve yasal uyumu korur."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "beginner",
+    "stem": "Rotamen sisteminde 'Adres Skor Dağılımı' raporu neyi analiz eder?",
+    "choices": ["A) Adreslerin doğruluk oranlarını", "B) Barkod sıralarını", "C) Sefer sürelerini", "D) Yakıt tüketimini"],
+    "answer_index": 0,
+    "rationale": "Adres Skor Dağılımı, teslimat adreslerinin doğruluk seviyelerini analiz eder."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS'un 'Başkalarının Fikri Mülkiyet Haklarına Saygı' politikası neyi kapsar?",
+    "choices": ["A) Telifli yazılımların izinsiz kopyalanmamasını", "B) Herkesin belgeleri paylaşmasını", "C) Patentlerin herkese açık olmasını", "D) Gizli bilgilerin dış kaynaklarda saklanmasını"],
+    "answer_index": 0,
+    "rationale": "Bu politika, telif hakkı, patent ve lisanslı yazılımların izinsiz kullanımını engeller."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy Hybrid Planlama modülünde 'Stage Bar' neyin takibini sağlar?",
+    "choices": ["A) KM değişimleri, transfer ve sıralama etkilerini zaman çizelgesinde gösterir", "B) Sürücü performansını ölçer", "C) Harita renklerini değiştirir", "D) Gün sonu raporlarını oluşturur"],
+    "answer_index": 0,
+    "rationale": "Stage Bar, planlama sürecindeki değişikliklerin kilometre, uğrama ve zaman etkilerini izler."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Mobil uygulamada 'Nasıl Giderim?' butonu neyi yapar?",
+    "choices": ["A) Navigasyon uygulamasını açarak rota yönlendirmesi yapar", "B) Haritayı kapatır", "C) Teslimatları yeniden sıralar", "D) Barkod okutmayı başlatır"],
+    "answer_index": 0,
+    "rationale": "Bu buton, telefonda yüklü navigasyon uygulamasını açarak rotayı başlatır."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS prensiplerine göre 'Misilleme yasağı' neden önemlidir?",
+    "choices": ["A) Şikayet edenlerin korunmasını sağlar", "B) Raporlamayı zorlaştırır", "C) Gizli bilgilerin paylaşımını artırır", "D) İletişimi sınırlar"],
+    "answer_index": 0,
+    "rationale": "Misilleme yasağı, etik ihlalleri bildiren kişilerin korunmasını sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Rotamen Lecy arayüzü hangi verileri gösterir?",
+    "choices": ["A) Canlı teslimat görüntüleri ve fotoğraf kanıtları", "B) Planlama parametrelerini", "C) Barkod tanımlamalarını", "D) Şirket duyurularını"],
+    "answer_index": 0,
+    "rationale": "Lecy, sahadan gelen teslimat fotoğraflarını ve teslimat durumlarını anlık olarak görüntüler."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS'un 'Şirkete Ait Gizli Bilgilerin Korunması' politikası neyi amaçlar?",
+    "choices": ["A) Gizli bilgilerin yalnızca yetkili kişilere açık olmasını", "B) Bilgilerin serbest paylaşımını", "C) Gizli belgelerin dışa açılmasını", "D) Belgelerin kopyalanmasını"],
+    "answer_index": 0,
+    "rationale": "Bu politika, gizli verilerin yalnızca yetkili kişilerce erişilebilir olmasını sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Mobil uygulamada 'Fotoğraf Çek' fonksiyonu ne işe yarar?",
+    "choices": ["A) Teslimat teyidi için görsel kanıt ekler", "B) Gün sonu raporunu kapatır", "C) Müşteri bilgilerini değiştirir", "D) Yeni sipariş ekler"],
+    "answer_index": 0,
+    "rationale": "Fotoğraf çekme özelliği, teslimatın kanıtlanması amacıyla kullanılır."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy planlamasında 'Tır Kapasitesi' göstergesi neyi belirtir?",
+    "choices": ["A) Araçta planlanan toplam palet miktarını", "B) Teslimat sırasını", "C) Planlama algoritmasını", "D) Yakıt raporunu"],
+    "answer_index": 0,
+    "rationale": "Tır kapasitesi göstergesi, planlanan toplam palet miktarını ve doluluk oranını ifade eder."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "beginner",
+    "stem": "ONUSS prensiplerine göre ofis içindeki saygılı iletişimin temel amacı nedir?",
+    "choices": ["A) İş birliği ve profesyonel ortamı korumak", "B) Tartışmaları artırmak", "C) Rakiplerle bilgi paylaşmak", "D) Yöneticilere eleştiri yöneltmemek"],
+    "answer_index": 0,
+    "rationale": "Saygılı iletişim, iş birliği ve profesyonel bir ortamın sürdürülebilmesi için gereklidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "beginner",
+    "stem": "Rotamen sisteminde 'Raporlar' menüsü kullanıcıya ne sağlar?",
+    "choices": ["A) Araç, teslimat, süre ve performans istatistiklerini görüntüler", "B) Yeni sipariş ekler", "C) Planlamayı sıfırlar", "D) Harita görünümünü kapatır"],
+    "answer_index": 0,
+    "rationale": "Raporlar, operasyon performansını analiz etmeye yarar."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS’un çevre politikası hangi ilkeye dayanır?",
+    "choices": ["A) Tüm çevre kanunlarına ve yönetmeliklerine tam uyum", "B) Atıkların serbest bırakılması", "C) Sadece ekonomik faydaya odaklanma", "D) Geri dönüşümün ertelenmesi"],
+    "answer_index": 0,
+    "rationale": "ONUSS çevre politikası, yasalara uyum ve sürdürülebilir çevre bilincine dayanır."
+  },
+   {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Rotamen mobil uygulamasında 'Beni Hatırla' seçeneği ne yapar?",
+    "choices": ["A) Kullanıcı bilgilerini sonraki girişte otomatik doldurur", "B) Gün sonunu kaydeder", "C) Barkodları siler", "D) Navigasyonu kapatır"],
+    "answer_index": 0,
+    "rationale": "Beni Hatırla, kullanıcı adı ve şifre bilgisinin kaydedilmesini sağlar."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy planlamasında 'Yol Süresi' metriği neyi ifade eder?",
+    "choices": ["A) Depodan çıkış ile dönüş arasındaki toplam süreyi", "B) Planlamacının işlem süresini", "C) Barkod okutma süresini", "D) Sürücü molalarını"],
+    "answer_index": 0,
+    "rationale": "Yol süresi, aracın depo çıkışı ile dönüşü arasındaki toplam sürüş süresidir."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "intermediate",
+    "stem": "ONUSS prensiplerine göre doğru seçim yaparken hangi soru sorulmalıdır?",
+    "choices": ["A) Bu hareket ONUSS’un değerlerini yansıtıyor mu?", "B) Kısa sürede fayda sağlar mı?", "C) Kimse fark eder mi?", "D) Sosyal medyada paylaşılır mı?"],
+    "answer_index": 0,
+    "rationale": "ONUSS, karar alınırken her zaman şirketin değerlerine uygunluk sorgusunu önerir."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "intermediate",
+    "stem": "Planlama yetkilisi panelinde 'Dashboard' hangi verileri görselleştirir?",
+    "choices": ["A) Planlanan ve gerçekleşen seferlerin zaman, KM ve verimlilik verilerini", "B) Barkod listelerini", "C) Kullanıcı izinlerini", "D) Mobil cihaz bağlantılarını"],
+    "answer_index": 0,
+    "rationale": "Dashboard, operasyonun zaman, mesafe ve performans verilerini grafiklerle sunar."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "advanced",
+    "stem": "Lucy planlamasında 'Günlük ve Çift Rut' ayrımı neye göre yapılır?",
+    "choices": ["A) Araçların toplam mesai saatine göre", "B) Palet hacmine göre", "C) Rota uzunluğuna göre", "D) Sürücü sayısına göre"],
+    "answer_index": 0,
+    "rationale": "Günlük ve çift rutlar, toplam mesai süresine göre gruplanarak planlanır."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "beginner",
+    "stem": "ONUSS'un temel değeri olan 'Bütünlük' hangi davranışları içerir?",
+    "choices": ["A) Dürüstlük, saygı ve güvenilirlik", "B) Gizlilik ihlali", "C) Rekabeti azaltma", "D) Raporlamayı geciktirme"],
+    "answer_index": 0,
+    "rationale": "Bütünlük değeri, dürüstlük ve güvene dayalı davranışları ifade eder."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "advanced",
+    "stem": "Rotamen Planlama sisteminde 'LUCY HYBRID' neyi ifade eder?",
+    "choices": ["A) Yapay zeka destekli planlama ve manuel düzenleme kombinasyonunu", "B) Sadece manuel planlama", "C) Barkod kontrol sistemi", "D) Raporlama aracı"],
+    "answer_index": 0,
+    "rationale": "Lucy Hybrid, yapay zekanın otomatik planlamasıyla manuel müdahaleyi birleştiren modüldür."
+  },
+  {
+    "type": "mcq",
+    "topic": "support flow",
+    "level": "intermediate",
+    "stem": "Rotamen süreçlerinde 'Müşteri SMS Bildirimi' hangi aşamalarda yapılır?",
+    "choices": ["A) Gidiyorum ve Sefer Başlat", "B) Yükleme öncesi", "C) Gün sonu", "D) İrsaliye kesimi sonrası"],
+    "answer_index": 0,
+    "rationale": "Müşteriye teslimat bilgisi Gidiyorum ve Sefer Başlat aşamalarında SMS ile bildirilir."
+  },
+  {
+    "type": "mcq",
+    "topic": "security policy",
+    "level": "advanced",
+    "stem": "ONUSS prensiplerine göre 'Doğru İletişim' ilkesi hangi durumu kapsar?",
+    "choices": ["A) Saygılı, açık ve çözüm odaklı diyalog kurmayı", "B) Tartışmaları büyütmeyi", "C) Sosyal medyada eleştiri paylaşmayı", "D) Gizli bilgileri paylaşmayı"],
+    "answer_index": 0,
+    "rationale": "Doğru iletişim, saygı ve açıklıkla sorun çözmeye odaklanmayı ifade eder."
+  },
+  {
+    "type": "mcq",
+    "topic": "product basic",
+    "level": "beginner",
+    "stem": "Mobil uygulamada 'İrsaliye Kesildi' statüsü neyi belirtir?",
+    "choices": ["A) Yükleme tamamlanmış ve sefer emri bekleniyor", "B) Teslimat bitmiştir", "C) Sipariş iptal edilmiştir", "D) Gün sonu yapılmıştır"],
+    "answer_index": 0,
+    "rationale": "İrsaliye Kesildi statüsü, yükleme tamamlandığında ve sefer başlatma emrinin beklendiği durumu gösterir."
+  }
+]

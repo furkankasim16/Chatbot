@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { CheckCircle2, XCircle, ExternalLink } from "lucide-react"
-import type { Question } from "@/app/page"
+import type { Question } from "@/app/types/quiz"
 
 interface FeedbackScreenProps {
   question: Question
@@ -41,19 +41,27 @@ export function FeedbackScreen({ question, userAnswer, onNext, isLastQuestion }:
           <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-2">
             <p className="text-sm font-medium text-muted-foreground">Correct Answer</p>
             <p className="text-base text-card-foreground font-medium">
-              {Array.isArray(question.correctAnswer) ? question.correctAnswer.join(", ") : question.correctAnswer}
+              {Array.isArray(question.correctAnswer)
+                ? question.correctAnswer.join(", ")
+                : question.correctAnswer}
             </p>
           </div>
         )}
 
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-card-foreground uppercase tracking-wide">Explanation</h4>
-          <p className="text-base text-muted-foreground leading-relaxed">{question.rationale}</p>
+          <p className="text-base text-muted-foreground leading-relaxed">
+            {question.rationale || "No explanation provided for this question."}
+          </p>
         </div>
 
-        <div className="pt-4 border-t border-border">
-          <SourceCard source={question.source} />
-        </div>
+        {/* Source sadece varsa gösteriyoruz */}
+        {question.source && (
+          <div className="pt-4 border-t border-border">
+            {/* TS'e karışma demek için as any veriyoruz */}
+            <SourceCard source={question.source as any} />
+          </div>
+        )}
 
         <Button onClick={onNext} className="w-full h-12 text-base font-medium" size="lg">
           {isLastQuestion ? "View Results" : "Next Question"}
@@ -63,18 +71,37 @@ export function FeedbackScreen({ question, userAnswer, onNext, isLastQuestion }:
   )
 }
 
-function SourceCard({ source }: { source: Question["source"] }) {
+// Burada Question["source"] yerine kendi tipimizi tanımlıyoruz
+interface SourceInfo {
+  documentName?: string
+  page?: number
+  passageId?: string
+  snippet?: string
+}
+
+function SourceCard({ source }: { source?: SourceInfo | string | null }) {
+  // Eğer hiç yoksa ya da string ise (eski tip), kart göstermiyoruz
+  if (!source || typeof source === "string") return null
+
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-semibold text-card-foreground uppercase tracking-wide">Source Reference</h4>
+      <h4 className="text-sm font-semibold text-card-foreground uppercase tracking-wide">
+        Source Reference
+      </h4>
       <div className="p-4 rounded-lg bg-card border border-border hover:shadow-md transition-shadow">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <p className="font-medium text-card-foreground">{source.documentName}</p>
-              <p className="text-sm text-muted-foreground">
-                Page {source.page} • Passage {source.passageId}
+              <p className="font-medium text-card-foreground">
+                {source.documentName || "Unknown source"}
               </p>
+              {(typeof source.page === "number" || source.passageId) && (
+                <p className="text-sm text-muted-foreground">
+                  {typeof source.page === "number" ? `Page ${source.page}` : ""}
+                  {typeof source.page === "number" && source.passageId ? " • " : ""}
+                  {source.passageId ? `Passage ${source.passageId}` : ""}
+                </p>
+              )}
             </div>
             <Button variant="ghost" size="sm" className="flex-shrink-0">
               <ExternalLink className="w-4 h-4" />
@@ -82,7 +109,9 @@ function SourceCard({ source }: { source: Question["source"] }) {
           </div>
 
           <div className="p-3 rounded bg-muted/50 border-l-2 border-primary">
-            <p className="text-sm text-muted-foreground italic leading-relaxed">"{source.snippet}"</p>
+            <p className="text-sm text-muted-foreground italic leading-relaxed">
+              {source.snippet ? `"${source.snippet}"` : "No snippet available for this question."}
+            </p>
           </div>
         </div>
       </div>
@@ -96,8 +125,14 @@ function checkAnswer(question: Question, userAnswer: string | string[]): boolean
   }
 
   if (Array.isArray(userAnswer)) {
-    return JSON.stringify(userAnswer.sort()) === JSON.stringify((question.correctAnswer as string[]).sort())
+    return (
+      JSON.stringify(userAnswer.sort()) ===
+      JSON.stringify((question.correctAnswer as string[]).sort())
+    )
   }
 
-  return userAnswer.toLowerCase().trim() === (question.correctAnswer as string).toLowerCase().trim()
+  return (
+    userAnswer.toLowerCase().trim() ===
+    (question.correctAnswer as string).toLowerCase().trim()
+  )
 }
