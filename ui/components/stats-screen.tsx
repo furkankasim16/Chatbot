@@ -2,7 +2,15 @@
 
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Trophy, Target, TrendingUp, Calendar, Award, BarChart3 } from "lucide-react"
+import {
+  Trophy,
+  Target,
+  TrendingUp,
+  Calendar,
+  Award,
+  BarChart3,
+  Clock,          // ⬅️ eklendi
+} from "lucide-react"
 import type { UserStats } from "@/lib/api"
 
 interface StatsScreenProps {
@@ -41,6 +49,15 @@ export function StatsScreen({ stats, onBack }: StatsScreenProps) {
     },
   ]
 
+  // ⏱️ ms → Xm YYs formatına çeviren helper
+  const formatMsToMinSec = (ms?: number) => {
+    if (!ms || ms <= 0) return "—"
+    const totalSeconds = Math.round(ms / 1000)
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    return `${minutes}dk ${seconds.toString().padStart(2, "0")}sn`
+  }
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
@@ -53,6 +70,7 @@ export function StatsScreen({ stats, onBack }: StatsScreenProps) {
         </Button>
       </div>
 
+      {/* Genel istatistik kartları */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => {
           const Icon = stat.icon
@@ -72,6 +90,7 @@ export function StatsScreen({ stats, onBack }: StatsScreenProps) {
         })}
       </div>
 
+      {/* Son aktivite */}
       <Card className="p-6">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -94,6 +113,56 @@ export function StatsScreen({ stats, onBack }: StatsScreenProps) {
         </div>
       </Card>
 
+      {/* ⏱️ Zaman istatistikleri */}
+      {(stats.total_quiz_duration_ms ||
+        stats.avg_quiz_duration_ms ||
+        stats.avg_question_duration_ms) && (
+        <Card className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Zaman İstatistikleri</h3>
+                <p className="text-sm text-muted-foreground">
+                  Quiz ve soru süreleriniz time modülünden alınmıştır.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Toplam Quiz Süresi</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {formatMsToMinSec(stats.total_quiz_duration_ms)}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Ortalama Quiz Süresi</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {formatMsToMinSec(stats.avg_quiz_duration_ms)}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Ortalama Soru Süresi</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {formatMsToMinSec(stats.avg_question_duration_ms)}
+                </p>
+                {typeof stats.total_questions_timed === "number" && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ölçülen soru sayısı: {stats.total_questions_timed}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Konu bazlı performans */}
       {stats.topic_stats && Object.keys(stats.topic_stats).length > 0 && (
         <Card className="p-6">
           <div className="space-y-4">

@@ -45,13 +45,28 @@ export interface RegisterRequest {
   password: string
 }
 
+export interface TopicStatsEntry {
+  correct: number
+  total: number
+}
+
 export interface UserStats {
   total_quizzes: number
   total_questions: number
   correct_answers: number
   last_quiz_date: string | null
-  topic_stats: Record<string, { correct: number; total: number }>
+  topic_stats: Record<string, TopicStatsEntry>
+
+  // ⏱️ Quiz bazlı süreler (ms)
+  total_quiz_duration_ms: number
+  avg_quiz_duration_ms: number
+
+  // ⏱️ Soru bazlı süreler
+  total_questions_timed: number
+  total_question_duration_ms: number
+  avg_question_duration_ms: number
 }
+
 
 export interface QuizResult {
   topic: string
@@ -59,24 +74,22 @@ export interface QuizResult {
   total_questions: number
   correct_answers: number
   completed_at: string
+  // Yeni: soru bazlı detaylar (JSON string olarak)
+  questions_attempted?: string
 }
 
 export interface QuizAttempt {
   id: number
-  user_id: number
   username: string
-  quiz_date: string
+  quiz_date: string | null
   topic: string
   difficulty: string
   total_questions: number
   correct_answers: number
   score: number
-  questions_attempted: Array<{
-    question_id: string
-    user_answer: string
-    is_correct: boolean
-  }>
+  questions_attempted?: string | any[]
 }
+
 
 export interface EvaluateAnswerRequest {
   question: string
@@ -423,8 +436,10 @@ export async function createFirstAdmin(username: string, email: string, password
 }
 
 // Get all user activity (Admin only)
-export async function getUserActivity(token: string) {
-  const res = await fetch(`${API}/admin/user-activity`, { headers: { Authorization: `Bearer ${token}` } })
+export async function getUserActivity(token: string): Promise<QuizAttempt[]> {
+  const res = await fetch(`${API}/admin/user-activity`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
   if (!res.ok) throw new Error("Kullanıcı aktivitesi yüklenemedi")
   return res.json()
 }
@@ -538,17 +553,36 @@ export async function startQuizTiming(
 }
 
 // End quiz timing
+export interface EndQuizTimingPayload {
+  attempt_id: number
+  correct_answers: number
+  score: number
+  client_end_time?: string
+  total_duration_ms?: number
+  // 🔥 Yeni
+  questions_attempted?: string
+}
+
 export async function endQuizTiming(
   token: string,
-  attemptId: number
-): Promise<{ success: boolean }> {
-  return authPost<{ success: boolean }>(
-    `${API_BASE_URL}/api/v1/quiz/attempt/end`,
-    token,
-    {
-      attempt_id: attemptId,
-    }
-  )
+  body: EndQuizTimingPayload
+) {
+  const res = await fetch("http://localhost:8000/api/v1/quiz/attempt/end", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    console.error("[v0] endQuizTiming failed:", res.status, text)
+    throw new Error(`Failed to finalize quiz attempt: ${res.status} ${text}`)
+  }
+
+  return res.json()
 }
 
 export interface StartQuestionTimingPayload {
@@ -582,4 +616,19 @@ export async function endQuestionTiming(
     token,
     payload
   )
+}
+
+export interface FinishQuizAttemptPayload {
+  attempt_id: number
+  correct_answers: number
+  score: number
+  client_end_time?: string
+  total_duration_ms?: number
+}
+
+export async function finishQuizAttempt(
+  token: string,
+  body: FinishQuizAttemptPayload
+) {
+  return authPost("/quiz/attempt/end", token, body)
 }

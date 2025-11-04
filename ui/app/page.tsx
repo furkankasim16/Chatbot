@@ -236,84 +236,129 @@ export default function QuizWidget() {
     setScreen("feedback")
   }
 
-  const handleNext = async () => {
+        const handleNext = async () => {
+    // 1) Önce mevcut sorunun timing'ini kapat
     if (currentQuestionTimingId && user) {
-    try {
-    await endQuestionTiming(user.access_token, {
-      timing_id: currentQuestionTimingId,
-      // client_end_time: new Date().toISOString()
-    })
-    timer.endQuestion()
-  } catch (error) {
-    console.error("[v0] Failed to end question timing:", error)
-  }
-}
+      try {
+        await endQuestionTiming(user.access_token, {
+          timing_id: currentQuestionTimingId,
+          client_end_time: new Date().toISOString(),
+        })
+        timer.endQuestion()
+      } catch (error) {
+        console.error("[v0] Failed to end question timing:", error)
+      }
+    }
 
     const totalQuestions = config?.mode === "daily" ? 1 : config?.mode === "quick" ? 5 : 3
 
+    // 2) Son soru değilse bir sonrakine geç
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex((prev) => prev + 1)
       setShowFeedback(false)
       setScreen("quiz")
-    } else {
-      if (quizAttemptId && user) {
-        try {
-          await endQuizTiming(user.access_token, quizAttemptId)
-          timer.endQuiz()
-        } catch (error) {
-          console.error("[v0] Failed to end quiz timing:", error)
-        }
-      }
-
-      if (config?.mode === "daily") {
-        localStorage.setItem("lastDailyQuizCompletion", new Date().toISOString())
-      }
-
-      if (user && config) {
-        let correctCount = 0
-        for (const q of questions) {
-          const userAnswer = userAnswers[q.id]
-          if (!userAnswer) continue
-          let isCorrect = false
-          if (q.type === "mcq" || q.type === "true_false") {
-            isCorrect = String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()
-          } else if (q.type === "short_answer") {
-            const norm = (s: string) => s.toLowerCase().trim().replace(/[.,!?;:]/g, "")
-            isCorrect = norm(String(userAnswer)) === norm(String(q.correctAnswer))
-          } else {
-            try {
-              const evaluation = await evaluateAnswer(user.access_token, q.stem, String(q.correctAnswer), String(userAnswer))
-              isCorrect = evaluation.is_correct
-            } catch {
-              const userWords = String(userAnswer).toLowerCase().split(/\s+/)
-              const expectedWords = String(q.correctAnswer).toLowerCase().split(/\s+/)
-              const matchCount = userWords.filter((w) => expectedWords.includes(w)).length
-              const similarity = matchCount / Math.max(userWords.length, expectedWords.length)
-              isCorrect = similarity > 0.4
-            }
-          }
-          if (isCorrect) correctCount++
-        }
-
-        const quizResult = {
-          topic: config.topic,
-          difficulty: config.difficulty,
-          total_questions: questions.length,
-          correct_answers: correctCount,
-          completed_at: new Date().toISOString(),
-        }
-
-        try {
-          await submitQuizResult(user.access_token, quizResult)
-          await loadUserStats(user.access_token)
-        } catch (error) {
-          console.error("[v0] Failed to save quiz result:", error)
-        }
-      }
-
-      setScreen("results")
+      return
     }
+
+    // 3) Buraya geldiysek quiz bitti
+    timer.endQuiz()
+
+    if (config?.mode === "daily") {
+      localStorage.setItem("lastDailyQuizCompletion", new Date().toISOString())
+    }
+
+    if (user && config) {
+      let correctCount = 0
+
+      const detailedQuestions: {
+        question_id: string
+        stem: string
+        user_answer: string | string[]
+        correct_answer: string | string[]
+        is_correct: boolean
+      }[] = []
+
+      for (const q of questions) {
+        const userAnswer = userAnswers[q.id]
+
+        if (!userAnswer) {
+          detailedQuestions.push({
+            question_id: String(q.id),
+            stem: q.stem,
+            user_answer: "",
+            correct_answer: (q.correctAnswer ?? "") as string | string[],
+            is_correct: false,
+          })
+          continue
+        }
+
+        let isCorrect = false
+
+        if (q.type === "mcq" || q.type === "true_false") {
+          isCorrect = String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()
+        } else if (q.type === "short_answer") {
+          const norm = (s: string) => s.toLowerCase().trim().replace(/[.,!?;:]/g, "")
+          isCorrect = norm(String(userAnswer)) === norm(String(q.correctAnswer))
+        } else {
+          try {
+            const evaluation = await evaluateAnswer(
+              user.access_token,
+              q.stem,
+              String(q.correctAnswer),
+              String(userAnswer),
+            )
+            isCorrect = evaluation.is_correct
+          } catch {
+            const userWords = String(userAnswer).toLowerCase().split(/\s+/)
+            const expectedWords = String(q.correctAnswer).toLowerCase().split(/\s+/)
+            const matchCount = userWords.filter((w) => expectedWords.includes(w)).length
+            const similarity = matchCount / Math.max(userWords.length, expectedWords.length)
+            isCorrect = similarity > 0.4
+          }
+        }
+
+        if (isCorrect) correctCount++
+
+        detailedQuestions.push({
+          question_id: String(q.id),
+          stem: q.stem,
+          user_answer: userAnswer as string | string[],
+          correct_answer: (q.correctAnswer ?? "") as string | string[],
+          is_correct: isCorrect,
+        })
+      }
+
+      const totalQuestionsInResult = questions.length
+      const numericScore = totalQuestionsInResult > 0 ? (correctCount / totalQuestionsInResult) * 100 : 0
+      const score = Math.round(numericScore)
+
+      // 🔥 Artık tüm finalize işlemi attempt/end üzerinden
+      if (quizAttemptId) {
+        try {
+          await endQuizTiming(user.access_token, {
+            attempt_id: quizAttemptId,
+            correct_answers: correctCount,
+            score,
+            client_end_time: new Date().toISOString(),
+            total_duration_ms: timer.totalQuizTime,
+            questions_attempted: JSON.stringify(detailedQuestions),
+          })
+        } catch (error) {
+          console.error("[v0] Failed to finalize quiz attempt:", error)
+        }
+      }
+
+      // Stats endpoint'i quiz_attempts üzerinden çalıştığı için sadece yeniden çekmemiz yeterli
+      try {
+        await loadUserStats(user.access_token)
+      } catch (error) {
+        console.error("[v0] Failed to reload user stats:", error)
+      }
+    }
+
+    setScreen("results")
   }
+
 
   const handleRestart = () => {
     setScreen("home")

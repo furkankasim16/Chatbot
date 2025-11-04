@@ -22,4 +22,8 @@ def list_questions(limit: int = 100, offset: int = 0, _=Depends(on_start_questio
 
 @router.get("/user-activity")
 def get_user_activity(limit: int = 100, _=Depends(on_start_app_db)):
+    """
+    Kullanıcıların quiz aktivitelerini getirir.
+    Admin panelindeki tablo bu veriyi kullanır.
+    """
     return user_activity(limit=limit)

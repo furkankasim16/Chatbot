@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -6,6 +6,7 @@ from pytest import Session
 import requests,os,json
 import re as regex
 from app.api.deps import on_start_app_db, on_start_questions_db
+from app.core.db import app_cursor
 from app.domain.schemas.quiz import QuizStartIn, QuizEndIn, QuestionTimingIn, TimeEventIn
 from app.domain.repositories.quiz_repo import add_time_event, create_attempt, end_attempt, add_question_timing
 from app.domain.repositories.quesitons_repo import get_random
@@ -67,6 +68,14 @@ class QuizAttemptStartRequest(BaseModel):
     total_questions: int
     start_time: datetime
     mode: str | None = None
+
+class QuizAttemptEndRequest(BaseModel):
+    attempt_id: int
+    correct_answers: int
+    score: float
+    total_duration_ms: int
+    client_end_time: datetime | None = None 
+    questions_attempted: Optional[str] = None   
 
 class QuizQuestionOut(BaseModel):
     id: Optional[int] = None
@@ -327,9 +336,44 @@ def start_quiz_attempt(
 
     return {"attempt_id": attempt_id}
 
-@router.post("/attempt/end", response_model=OkOut)
-def quiz_attempt_end(data: QuizEndIn, _=Depends(on_start_app_db)):
-    end_attempt(data.model_dump())
+@router.post("/attempt/end", dependencies=[Depends(on_start_app_db)])
+def end_quiz_attempt(payload: QuizAttemptEndRequest, current=Depends(get_current_user)):
+    user_id = current["id"]
+
+    server_end_time = datetime.now(timezone.utc).isoformat()
+    end_time = payload.client_end_time or server_end_time
+
+    with app_cursor() as c:
+        # Kullanıcıya ait doğru attempt mi?
+        row = c.execute(
+            "SELECT id FROM quiz_attempts WHERE id=? AND user_id=?",
+            (payload.attempt_id, user_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Quiz attempt not found")
+
+        c.execute(
+            """
+            UPDATE quiz_attempts
+            SET
+              end_time = ?,
+              total_duration_ms = COALESCE(?, total_duration_ms),
+              correct_answers = ?,
+              score = ?,
+              questions_attempted = COALESCE(?, questions_attempted)
+            WHERE id = ? AND user_id = ?
+            """,
+            (
+                end_time,
+                payload.total_duration_ms,
+                payload.correct_answers,
+                payload.score,
+                payload.questions_attempted,
+                payload.attempt_id,
+                user_id,
+            ),
+        )
+
     return {"ok": True}
 
 # --------------------------

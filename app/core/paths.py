@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # ---- Proje kökü (örnek: Chatbot/)
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 # ---- Veri dizinleri ----
 DATA_DIR = ROOT / "data"

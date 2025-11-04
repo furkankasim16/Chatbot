@@ -12,38 +12,74 @@ def create_attempt(data: Dict[str, Any]) -> int:
 def end_attempt(data: Dict[str, Any]) -> None:
     with app_cursor() as c:
         c.execute("""
-        UPDATE quiz_attempts SET end_time=?, correct_answers=?, score=?, total_duration_ms=?, questions_attempted=?
+        UPDATE quiz_attempts
+        SET end_time=?, correct_answers=?, score=?, total_duration_ms=?, questions_attempted=?
         WHERE id=?
-        """, (data["end_time"], data["correct_answers"], data["score"], data["total_duration_ms"], data["questions_attempted"], data["attempt_id"]))
+        """, (
+            data["end_time"],
+            data["correct_answers"],
+            data["score"],
+            data["total_duration_ms"],
+            data["questions_attempted"],
+            data["attempt_id"],
+        ))
 
 def add_question_timing(data: Dict[str, Any]) -> None:
     with app_cursor() as c:
         c.execute("""
         INSERT INTO question_timings(attempt_id, question_id, start_time, end_time, duration_ms)
         VALUES(?,?,?,?,?)
-        """, (data["attempt_id"], data["question_id"], data.get("start_time"), data.get("end_time"), data.get("duration_ms")))
+        """, (
+            data["attempt_id"],
+            data["question_id"],
+            data.get("start_time"),
+            data.get("end_time"),
+            data.get("duration_ms"),
+        ))
 
 def add_time_event(data: Dict[str, Any]) -> None:
     with app_cursor() as c:
         c.execute("""
         INSERT INTO time_events(attempt_id, event_type, ts, meta_json)
         VALUES(?,?,?,?)
-        """, (data["attempt_id"], data["event_type"], data["ts"], data.get("meta_json")))
+        """, (
+            data["attempt_id"],
+            data["event_type"],
+            data["ts"],
+            data.get("meta_json"),
+        ))
 
 def user_activity(limit: int = 100) -> List[dict]:
     with app_cursor() as c:
         c.execute("""
-        SELECT qa.id, u.username, qa.topic, qa.difficulty, qa.total_questions,
-               qa.correct_answers, qa.score, qa.start_time, qa.end_time, qa.total_duration_ms
-        FROM quiz_attempts qa JOIN users u ON qa.user_id=u.id
-        ORDER BY qa.id DESC LIMIT ?
+            SELECT
+              qa.id,
+              u.username,
+              qa.quiz_date,
+              qa.topic,
+              qa.difficulty,
+              qa.total_questions,
+              qa.correct_answers,
+              qa.score,
+              qa.questions_attempted
+            FROM quiz_attempts qa
+            JOIN users u ON u.id = qa.user_id
+            ORDER BY qa.id DESC
+            LIMIT ?
         """, (limit,))
         rows = c.fetchall()
-    out=[]
+
+    out: List[dict] = []
     for r in rows:
         out.append({
-          "attempt_id": r[0], "username": r[1], "topic": r[2], "difficulty": r[3],
-          "total_questions": r[4], "correct_answers": r[5], "score": r[6],
-          "start_time": r[7], "end_time": r[8], "total_duration_ms": r[9]
+            "id": r["id"],
+            "username": r["username"],
+            "quiz_date": r["quiz_date"],
+            "topic": r["topic"],
+            "difficulty": r["difficulty"],
+            "total_questions": r["total_questions"],
+            "correct_answers": r["correct_answers"],
+            "score": r["score"],
+            "questions_attempted": r["questions_attempted"],
         })
     return out

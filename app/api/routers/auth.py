@@ -34,6 +34,16 @@ class UserStats(BaseModel):
     last_quiz_date: Optional[str]  # ISO string veya None
     topic_stats: Dict[str, Dict[str, int]]
 
+    # ⏱️ Quiz bazlı süreler (ms cinsinden)
+    total_quiz_duration_ms: int = 0
+    avg_quiz_duration_ms: float = 0.0
+
+    # ⏱️ Soru bazlı süreler
+    total_questions_timed: int = 0
+    total_question_duration_ms: int = 0
+    avg_question_duration_ms: float = 0.0
+
+
 # ---------- Auth helpers ----------
 def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
     with app_cursor() as c:
@@ -71,7 +81,7 @@ def login(form: OAuth2PasswordRequestForm = Depends()):
 def user_stats(current=Depends(get_current_user)):
     user_id = current["id"]
     with app_cursor() as c:
-        # toplam quiz, toplam sorular, toplam doğru, son tarih
+        # 1) Toplam quiz, toplam sorular, toplam doğru, son tarih (mevcut mantık)
         tq = c.execute(
             """
             SELECT
@@ -85,7 +95,7 @@ def user_stats(current=Depends(get_current_user)):
             (user_id,),
         ).fetchone() or (0, 0, 0, None)
 
-        # topic bazında doğru/toplam
+        # 2) topic bazında doğru/toplam (mevcut mantık)
         rows = c.execute(
             """
             SELECT topic,
@@ -98,7 +108,43 @@ def user_stats(current=Depends(get_current_user)):
             (user_id,),
         ).fetchall()
 
+        # 3) Quiz bazlı süreler (yalnızca duration'ı olan attempt'ler)
+        time_row = c.execute(
+            """
+            SELECT
+              COALESCE(SUM(total_duration_ms), 0) AS total_ms,
+              AVG(total_duration_ms) AS avg_ms
+            FROM quiz_attempts
+            WHERE user_id=?
+              AND total_duration_ms IS NOT NULL
+              AND total_duration_ms > 0
+            """,
+            (user_id,),
+        ).fetchone() or (0, 0)
+
+        # 4) Soru bazlı süreler (question_timings üzerinden)
+        qtime_row = c.execute(
+            """
+            SELECT
+              COUNT(qt.id) AS total_questions_timed,
+              COALESCE(SUM(qt.duration_ms), 0) AS total_question_duration_ms,
+              AVG(qt.duration_ms) AS avg_question_duration_ms
+            FROM question_timings qt
+            JOIN quiz_attempts qa ON qa.id = qt.attempt_id
+            WHERE qa.user_id = ?
+              AND qt.duration_ms IS NOT NULL
+            """,
+            (user_id,),
+        ).fetchone() or (0, 0, 0)
+
     topic_stats = {r[0]: {"correct": int(r[1]), "total": int(r[2])} for r in rows}
+
+    total_quiz_duration_ms = int(time_row[0] or 0)
+    avg_quiz_duration_ms = float(time_row[1] or 0.0)
+
+    total_questions_timed = int(qtime_row[0] or 0)
+    total_question_duration_ms = int(qtime_row[1] or 0)
+    avg_question_duration_ms = float(qtime_row[2] or 0.0)
 
     return {
         "total_quizzes": int(tq[0]),
@@ -106,6 +152,12 @@ def user_stats(current=Depends(get_current_user)):
         "correct_answers": int(tq[2]),
         "last_quiz_date": tq[3],
         "topic_stats": topic_stats,
+
+        "total_quiz_duration_ms": total_quiz_duration_ms,
+        "avg_quiz_duration_ms": avg_quiz_duration_ms,
+        "total_questions_timed": total_questions_timed,
+        "total_question_duration_ms": total_question_duration_ms,
+        "avg_question_duration_ms": avg_question_duration_ms,
     }
 
 @router.post("/register", dependencies=[Depends(on_start_app_db)])
