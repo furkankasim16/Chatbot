@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30 * 24 * 60
 
     OLLAMA_URL: AnyHttpUrl = "http://localhost:11434"
+    OLLAMA_MODEL : str = "llama3:instruct"
     EMBED_MODEL: str = "intfloat/multilingual-e5-large"
 
     # ⬇️ TİP ANOTASYONU EKLENDİ (Path)

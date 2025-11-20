@@ -56,3 +56,9 @@ def init_app_db():
           ts TEXT NOT NULL,
           meta_json TEXT
         )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS audit_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          action TEXT NOT NULL,
+          details TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
