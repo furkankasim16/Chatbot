@@ -1,3 +1,4 @@
+import random
 import requests, json, hashlib
 from typing import List, Literal, Optional
 from app.core.config import settings
@@ -5,6 +6,18 @@ from app.domain.schemas.question import Question
 from app.domain.repositories.quesitons_repo import add_question
 
 QuestionType = Literal["mcq","true_false","short_answer","scenario"]
+
+TOPICS = [
+    "product_basics",
+    "security_policy",
+    "support_flow",
+]
+
+LEVELS = [
+    "beginner",
+    "intermediate",
+    "advanced",
+]
 
 def _hash_payload(d: dict) -> str:
     return hashlib.sha256(json.dumps(d, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
@@ -86,3 +99,12 @@ def _find_json(s: str) -> str:
     i, j = s.find("{"), s.rfind("}")
     if i >= 0 and j >= 0 and j > i: return s[i:j+1]
     raise ValueError("no-json")
+
+def pick_random_topic_and_level() -> tuple[str, str]:
+    """
+    Admin panelindeki 'Rastgele Soru Üret' için
+    rastgele bir (topic, level) çifti seçer.
+    """
+    topic = random.choice(TOPICS)
+    level = random.choice(LEVELS)
+    return topic, level

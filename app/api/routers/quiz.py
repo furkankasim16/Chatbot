@@ -16,6 +16,7 @@ from app.api.deps import get_current_user
 import sqlite3
 from src.auth import get_db  
 from app.core.paths import APP_DB, QUESTIONS_DB
+from app.domain.services.audit_service import log_action
 
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -298,11 +299,12 @@ def build_quiz(data: QuizBuildIn, _=Depends(on_start_questions_db)):
 @router.post("/attempt/start")
 def start_quiz_attempt(
     payload: QuizAttemptStartRequest,
-    current_user = Depends(get_current_user),  # User type hint'i kaldırdık
+    current_user = Depends(get_current_user),
 ):
-    # quiz_date = sadece tarih kısmı
     quiz_date = payload.start_time.date().isoformat()
     start_time_str = payload.start_time.isoformat()
+
+    user_id = getattr(current_user, "id", current_user["id"])
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -320,8 +322,7 @@ def start_quiz_attempt(
         VALUES (?, ?, ?, ?, ?, ?)
         """,
         (
-            # get_current_user sende dict ise ["id"], model ise .id kullan
-            getattr(current_user, "id", current_user["id"]),
+            user_id,
             quiz_date,
             payload.topic,
             payload.difficulty,
@@ -334,7 +335,22 @@ def start_quiz_attempt(
     conn.commit()
     conn.close()
 
+    # 🔹 Audit log
+    log_action(
+        user_id=user_id,
+        action="QUIZ_ATTEMPT_START",
+        details={
+            "attempt_id": attempt_id,
+            "topic": payload.topic,
+            "difficulty": payload.difficulty,
+            "total_questions": payload.total_questions,
+            "start_time": start_time_str,
+            "mode": payload.mode,
+        },
+    )
+
     return {"attempt_id": attempt_id}
+
 
 @router.post("/attempt/end", dependencies=[Depends(on_start_app_db)])
 def end_quiz_attempt(payload: QuizAttemptEndRequest, current=Depends(get_current_user)):
@@ -344,7 +360,6 @@ def end_quiz_attempt(payload: QuizAttemptEndRequest, current=Depends(get_current
     end_time = payload.client_end_time or server_end_time
 
     with app_cursor() as c:
-        # Kullanıcıya ait doğru attempt mi?
         row = c.execute(
             "SELECT id FROM quiz_attempts WHERE id=? AND user_id=?",
             (payload.attempt_id, user_id),
@@ -374,7 +389,22 @@ def end_quiz_attempt(payload: QuizAttemptEndRequest, current=Depends(get_current
             ),
         )
 
+    # 🔹 Audit log
+    log_action(
+        user_id=user_id,
+        action="QUIZ_ATTEMPT_END",
+        details={
+            "attempt_id": payload.attempt_id,
+            "end_time": end_time,
+            "correct_answers": payload.correct_answers,
+            "score": payload.score,
+            "total_duration_ms": payload.total_duration_ms,
+            "questions_attempted": payload.questions_attempted,
+        },
+    )
+
     return {"ok": True}
+
 
 # --------------------------
 # Question Timing (başlangıç/bitiş)
@@ -387,7 +417,6 @@ def start_question_timing(
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # client_start_time geldiyse onu, yoksa server zamanı kullan
     start_dt = payload.client_start_time or datetime.utcnow()
     start_time_str = start_dt.isoformat()
 
@@ -407,6 +436,19 @@ def start_question_timing(
     conn.commit()
     conn.close()
 
+    # 🔹 Audit log
+    user_id = getattr(current_user, "id", current_user["id"])
+    log_action(
+        user_id=user_id,
+        action="QUIZ_QUESTION_TIMING_START",
+        details={
+            "timing_id": timing_id,
+            "attempt_id": payload.attempt_id,
+            "question_id": payload.question_id,
+            "start_time": start_time_str,
+        },
+    )
+
     return {"timing_id": timing_id}
 
 
@@ -418,7 +460,6 @@ def end_question_timing(
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # Önce başlangıç zamanını al
     row = c.execute(
         "SELECT start_time FROM question_timings WHERE id = ?",
         (payload.timing_id,),
@@ -430,11 +471,9 @@ def end_question_timing(
 
     start_time_str = row[0]
 
-    # end_time = client_end_time varsa onu, yoksa server zamanı
     end_dt = payload.client_end_time or datetime.utcnow()
     end_time_str = end_dt.isoformat()
 
-    # duration_ms hesapla (try/except ile güvene al)
     try:
         start_dt = datetime.fromisoformat(start_time_str)
         duration_ms = int((end_dt - start_dt).total_seconds() * 1000)
@@ -457,7 +496,20 @@ def end_question_timing(
     conn.commit()
     conn.close()
 
+    # 🔹 Audit log
+    user_id = getattr(current_user, "id", current_user["id"])
+    log_action(
+        user_id=user_id,
+        action="QUIZ_QUESTION_TIMING_END",
+        details={
+            "timing_id": payload.timing_id,
+            "end_time": end_time_str,
+            "duration_ms": duration_ms,
+        },
+    )
+
     return {"success": True}
+
 
 
 # --------------------------

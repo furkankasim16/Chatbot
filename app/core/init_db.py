@@ -62,3 +62,14 @@ def init_app_db():
           action TEXT NOT NULL,
           details TEXT NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        c.execute("""
+          CREATE TABLE IF NOT EXISTS llm_generation_runs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              model_name TEXT NOT NULL,
+              prompt_hash TEXT,
+              latency_ms INTEGER NOT NULL,
+              token_input INTEGER,
+              token_output INTEGER,
+              created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          );
+          """)

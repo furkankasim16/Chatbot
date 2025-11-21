@@ -5,7 +5,15 @@ const API = `${API_BASE_URL}/api/v1`
 
 export interface Question {
   id?: string
-  type: "mcq" | "true_false" | "short_answer" | "scenario" | "open_ended" | "short" | "senaryo" | "open"
+  type:
+    | "mcq"
+    | "true_false"
+    | "short_answer"
+    | "scenario"
+    | "open_ended"
+    | "short"
+    | "senaryo"
+    | "open"
   topic: string
   level: string
   stem: string
@@ -21,6 +29,9 @@ export interface Question {
     chunk: number
     topic: string
   }
+  // 🔥 LLM bilgisi (backend’ten geliyorsa burada dursun)
+  source_model?: string
+  source_type?: string
 }
 
 export interface QuizResponse {
@@ -67,7 +78,6 @@ export interface UserStats {
   avg_question_duration_ms: number
 }
 
-
 export interface QuizResult {
   topic: string
   difficulty: string
@@ -89,7 +99,6 @@ export interface QuizAttempt {
   score: number
   questions_attempted?: string | any[]
 }
-
 
 export interface EvaluateAnswerRequest {
   question: string
@@ -140,8 +149,27 @@ export interface StartQuizAttemptPayload {
   mode?: string
 }
 
+export interface AuditLog {
+  id: number
+  user_id: number
+  action: string
+  details: any
+  created_at: string
+  username?: string
+}
 
+export async function getAuditLogs(
+  token: string,
+  limit = 200,
+): Promise<AuditLog[]> {
+  const res = await fetch(`${API}/admin/audit-logs?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
 
+  if (!res.ok) throw new Error("Loglar yüklenemedi")
+
+  return res.json()
+}
 
 const MOCK_QUESTIONS: Question[] = [
   {
@@ -150,9 +178,15 @@ const MOCK_QUESTIONS: Question[] = [
     topic: "React",
     level: "beginner",
     stem: "What is the purpose of useState in React?",
-    choices: ["To manage component state", "To fetch data", "To style components", "To route pages"],
+    choices: [
+      "To manage component state",
+      "To fetch data",
+      "To style components",
+      "To route pages",
+    ],
     answer_index: 0,
-    rationale: "useState is a React Hook that lets you add state to functional components.",
+    rationale:
+      "useState is a React Hook that lets you add state to functional components.",
     source: {
       doc: "React Documentation",
       chunk: 1,
@@ -166,7 +200,8 @@ const MOCK_QUESTIONS: Question[] = [
     level: "beginner",
     stem: "JavaScript is a compiled language.",
     answer: false,
-    rationale: "JavaScript is an interpreted language, not a compiled language.",
+    rationale:
+      "JavaScript is an interpreted language, not a compiled language.",
     source: {
       doc: "JavaScript Basics",
       chunk: 2,
@@ -180,7 +215,8 @@ const MOCK_QUESTIONS: Question[] = [
     level: "intermediate",
     stem: "What does API stand for?",
     expected: "Application Programming Interface",
-    rationale: "API stands for Application Programming Interface, which allows different software to communicate.",
+    rationale:
+      "API stands for Application Programming Interface, which allows different software to communicate.",
     source: {
       doc: "Web Development Guide",
       chunk: 3,
@@ -190,8 +226,6 @@ const MOCK_QUESTIONS: Question[] = [
 ]
 
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true"
-
-
 
 // Health check
 export async function checkHealth() {
@@ -208,14 +242,21 @@ export async function getTopics() {
 }
 
 // Generate quiz for a topic
-export async function generateQuiz(topic: string, level = "beginner", n = 5, useOllama = false, qtype: string = "mcq") {
+export async function generateQuiz(
+  topic: string,
+  level = "beginner",
+  n = 5,
+  useOllama = false,
+  qtype: string = "mcq",
+) {
   const res = await fetch(`${API}/quiz/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ topic, level, n, use_ollama: useOllama, qtype }),
-  });
-  if (!res.ok) throw new Error(`Failed to generate quiz: ${res.status} ${res.statusText}`);
-  return res.json() as Promise<{ items: Question[]; shuffle: boolean }>;
+  })
+  if (!res.ok)
+    throw new Error(`Failed to generate quiz: ${res.status} ${res.statusText}`)
+  return res.json() as Promise<{ items: Question[]; shuffle: boolean }>
 }
 
 // Get random question (for Daily Question)
@@ -224,14 +265,23 @@ export async function getRandomQuestion(topic?: string, level?: string) {
   if (topic) params.append("topic", topic)
   if (level) params.append("level", level)
   const res = await fetch(`${API}/questions/random?${params}`)
-  if (!res.ok) throw new Error(`Failed to fetch random question: ${res.status} ${res.statusText}`)
+  if (!res.ok)
+    throw new Error(
+      `Failed to fetch random question: ${res.status} ${res.statusText}`,
+    )
   return res.json() as Promise<Question>
 }
 
 // Generate a new question
-export async function generateQuestion(topic: string, level = "beginner", qtype = "mcq"): Promise<Question> {
+export async function generateQuestion(
+  topic: string,
+  level = "beginner",
+  qtype = "mcq",
+): Promise<Question> {
   const res = await fetch(
-    `${API}/questions/generate?topic=${encodeURIComponent(topic)}&level=${level}&qtype=${qtype}`,
+    `${API}/questions/generate?topic=${encodeURIComponent(
+      topic,
+    )}&level=${level}&qtype=${qtype}`,
     { method: "POST" },
   )
   if (!res.ok) throw new Error("Failed to generate question")
@@ -253,52 +303,67 @@ export async function searchDocuments(query: string) {
 }
 
 // Get questions from DB
-export async function getQuestionsFromDB(topic: string, level: string, count: number) {
+export async function getQuestionsFromDB(
+  topic: string,
+  level: string,
+  count: number,
+) {
   const out: Question[] = []
   const exclude: string[] = []
   for (let i = 0; i < count; i++) {
     const params = new URLSearchParams({ topic, level })
     if (exclude.length) params.append("exclude", exclude.join(","))
     const res = await fetch(`${API}/questions/random?${params}`)
-    if (!res.ok) throw new Error(`Failed to fetch question: ${res.status} ${res.statusText}`)
+    if (!res.ok)
+      throw new Error(
+        `Failed to fetch question: ${res.status} ${res.statusText}`,
+      )
     const q = (await res.json()) as Question
     out.push(q)
     if (q.id) exclude.push(String(q.id))
-    if (i < count - 1) await new Promise(r => setTimeout(r, 100)) // ritim
+    if (i < count - 1) await new Promise((r) => setTimeout(r, 100)) // ritim
   }
   return out
 }
 
 // Login
-export async function login(username: string, password: string): Promise<LoginResponse> {
-  const body = new URLSearchParams();
-  body.append("username", username);
-  body.append("password", password);
+export async function login(
+  username: string,
+  password: string,
+): Promise<LoginResponse> {
+  const body = new URLSearchParams()
+  body.append("username", username)
+  body.append("password", password)
 
   const res = await fetch(`${API}/auth/login`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded"},
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
     body,
-  });
+  })
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Giriş başarısız" }));
-    throw new Error(error.detail || "Kullanıcı adı veya şifre hatalı");
+    const error = await res.json().catch(() => ({ detail: "Giriş başarısız" }))
+    throw new Error(error.detail || "Kullanıcı adı veya şifre hatalı")
   }
 
-  return res.json();
+  return res.json()
 }
 
-
 // Register
-export async function register(username: string, email: string, password: string) {
+export async function register(
+  username: string,
+  email: string,
+  password: string,
+) {
   const res = await fetch(`${API}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, email, password }),
   })
-  if (!res.ok) throw new Error("Bu kullanıcı adı veya e-posta zaten kullanılıyor")
+  if (!res.ok)
+    throw new Error("Bu kullanıcı adı veya e-posta zaten kullanılıyor")
   return res.json()
 }
 
@@ -327,7 +392,10 @@ export async function getUserStats(token: string): Promise<UserStats> {
 }
 
 // Submit quiz result
-export async function submitQuizResult(token: string, result: QuizResult): Promise<void> {
+export async function submitQuizResult(
+  token: string,
+  result: QuizResult,
+): Promise<void> {
   console.log("[v0] submitQuizResult called")
   console.log("[v0] API URL:", `${API}/auth/submit-result`)
   console.log("[v0] Result data:", result)
@@ -353,14 +421,20 @@ export async function submitQuizResult(token: string, result: QuizResult): Promi
   console.log("[v0] submitQuizResult response data:", responseData)
 }
 
-// Generate random question (Admin only)
-export async function generateRandomQuestion(token: string): Promise<Question> {
-  const res = await fetch(`${API}/admin/generate-random-question`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
+// 🔹 Generate random question (Admin only) — ARTIK MODEL PARAMETRELİ
+export async function generateRandomQuestion(
+  token: string,
+  model: string,
+): Promise<Question> {
+  const res = await fetch(
+    `${API}/admin/generate-random-question?model=${encodeURIComponent(model)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     },
-  })
+  )
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: "Soru üretilemedi" }))
@@ -370,17 +444,30 @@ export async function generateRandomQuestion(token: string): Promise<Question> {
   return res.json()
 }
 
-// Generate question with parameters (Admin only)
-export async function generateQuestionWithParams(token: string, topic: string, level: string, qtype: string) {
-  const res = await fetch(`${API}/admin/generate-question?topic=${encodeURIComponent(topic)}&level=${level}&qtype=${qtype}`, {
-    method: "POST", headers: { Authorization: `Bearer ${token}` },
+// 🔹 Generate question with parameters (Admin only) — ARTIK MODEL PARAMETRELİ
+export async function generateQuestionWithParams(
+  token: string,
+  topic: string,
+  level: string,
+  qtype: string,
+  model: string,
+) {
+  const url = `${API}/admin/generate-question?topic=${encodeURIComponent(
+    topic,
+  )}&level=${level}&qtype=${qtype}&model=${encodeURIComponent(model)}`
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) throw new Error("Soru üretilemedi")
   return res.json()
 }
 
-
-async function authPost<T>(url: string, token: string, body: unknown): Promise<T> {
+async function authPost<T>(
+  url: string,
+  token: string,
+  body: unknown,
+): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -388,24 +475,27 @@ async function authPost<T>(url: string, token: string, body: unknown): Promise<T
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-  });
+  })
 
   if (!res.ok) {
-    let info: any = null;
+    let info: any = null
     try {
-      info = await res.json();
+      info = await res.json()
     } catch {
-      info = await res.text();
+      info = await res.text()
     }
-    console.error("[API] POST failed", url, res.status, info);
-    throw new Error("Quiz başlatılamadı");
+    console.error("[API] POST failed", url, res.status, info)
+    throw new Error("Quiz başlatılamadı")
   }
 
-  return (await res.json()) as T;
+  return (await res.json()) as T
 }
 
 // Delete question (Admin only)
-export async function deleteQuestion(token: string, questionId: string): Promise<void> {
+export async function deleteQuestion(
+  token: string,
+  questionId: string,
+): Promise<void> {
   const res = await fetch(`${API}/admin/questions/${questionId}`, {
     method: "DELETE",
     headers: {
@@ -420,7 +510,11 @@ export async function deleteQuestion(token: string, questionId: string): Promise
 }
 
 // Create first admin user (No auth required, only works if no admin exists)
-export async function createFirstAdmin(username: string, email: string, password: string): Promise<void> {
+export async function createFirstAdmin(
+  username: string,
+  email: string,
+  password: string,
+): Promise<void> {
   const res = await fetch(`${API}/admin/create-first-admin`, {
     method: "POST",
     headers: {
@@ -430,13 +524,17 @@ export async function createFirstAdmin(username: string, email: string, password
   })
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "İlk admin oluşturulamadı" }))
+    const error = await res
+      .json()
+      .catch(() => ({ detail: "İlk admin oluşturulamadı" }))
     throw new Error(error.detail || "İlk admin oluşturulamadı")
   }
 }
 
 // Get all user activity (Admin only)
-export async function getUserActivity(token: string): Promise<QuizAttempt[]> {
+export async function getUserActivity(
+  token: string,
+): Promise<QuizAttempt[]> {
   const res = await fetch(`${API}/admin/user-activity`, {
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -483,13 +581,16 @@ export async function evaluateAnswer(
 }
 
 // Send chat message
-export async function sendChatMessage(token: string, message: string, context?: string): Promise<ChatResponse> {
+export async function sendChatMessage(
+  token: string,
+  message: string,
+  context?: string,
+): Promise<ChatResponse> {
   console.log("[v0] sendChatMessage called")
   console.log("[v0] API URL:", `${API}/chat`)
   console.log("[v0] Message:", message)
   console.log("[v0] Context:", context)
 
-  // Request body'yi oluştur
   const requestBody = {
     message: message,
     ...(context && { context: context }),
@@ -497,7 +598,6 @@ export async function sendChatMessage(token: string, message: string, context?: 
 
   console.log("[v0] Request body:", JSON.stringify(requestBody))
 
-  // AbortController ile timeout kontrolü
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 120000) // 120 saniye timeout
 
@@ -519,7 +619,9 @@ export async function sendChatMessage(token: string, message: string, context?: 
     if (!res.ok) {
       const errorText = await res.text().catch(() => "Unknown error")
       console.error("[v0] sendChatMessage error response:", errorText)
-      throw new Error(`Mesaj gönderilemedi: ${res.status} ${errorText}`)
+      throw new Error(
+        `Mesaj gönderilemedi: ${res.status} ${errorText}`,
+      )
     }
 
     const result = await res.json()
@@ -543,7 +645,7 @@ export async function sendChatMessage(token: string, message: string, context?: 
 // Start quiz timing
 export async function startQuizTiming(
   token: string,
-  payload: StartQuizAttemptPayload
+  payload: StartQuizAttemptPayload,
 ): Promise<{ attempt_id: number }> {
   return authPost<{ attempt_id: number }>(
     `${API_BASE_URL}/api/v1/quiz/attempt/start`,
@@ -565,21 +667,26 @@ export interface EndQuizTimingPayload {
 
 export async function endQuizTiming(
   token: string,
-  body: EndQuizTimingPayload
+  body: EndQuizTimingPayload,
 ) {
-  const res = await fetch("http://localhost:8000/api/v1/quiz/attempt/end", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+  const res = await fetch(
+    "http://localhost:8000/api/v1/quiz/attempt/end",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  })
+  )
 
   if (!res.ok) {
     const text = await res.text()
     console.error("[v0] endQuizTiming failed:", res.status, text)
-    throw new Error(`Failed to finalize quiz attempt: ${res.status} ${text}`)
+    throw new Error(
+      `Failed to finalize quiz attempt: ${res.status} ${text}`,
+    )
   }
 
   return res.json()
@@ -598,23 +705,23 @@ export interface EndQuestionTimingPayload {
 
 export async function startQuestionTiming(
   token: string,
-  payload: StartQuestionTimingPayload
+  payload: StartQuestionTimingPayload,
 ): Promise<{ timing_id: number }> {
   return authPost<{ timing_id: number }>(
     `${API_BASE_URL}/api/v1/quiz/question/start`,
     token,
-    payload
+    payload,
   )
 }
 
 export async function endQuestionTiming(
   token: string,
-  payload: EndQuestionTimingPayload
+  payload: EndQuestionTimingPayload,
 ): Promise<{ success: boolean }> {
   return authPost<{ success: boolean }>(
     `${API_BASE_URL}/api/v1/quiz/question/end`,
     token,
-    payload
+    payload,
   )
 }
 
@@ -628,7 +735,7 @@ export interface FinishQuizAttemptPayload {
 
 export async function finishQuizAttempt(
   token: string,
-  body: FinishQuizAttemptPayload
+  body: FinishQuizAttemptPayload,
 ) {
   return authPost("/quiz/attempt/end", token, body)
 }

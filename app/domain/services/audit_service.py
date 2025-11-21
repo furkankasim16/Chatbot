@@ -1,26 +1,39 @@
 # app/domain/services/audit_service.py
 
-from __future__ import annotations
+import json
+from typing import Any, Optional, List
 
-from typing import Any
-
-from app.domain.repositories.audit_repo import add_audit_log, list_recent_audit_logs
 from app.domain.schemas.audit import AuditLog
+from app.domain.repositories.audit_repo import add_audit_log, get_audit_logs
 
 
-def log_action(user_id: int, action: str, details: dict[str, Any] | None = None) -> None:
+def log_action(
+    *,
+    user_id: Optional[int],
+    action: str,
+    entity_type: Optional[str] = None,
+    entity_id: Optional[int] = None,
+    details: Optional[dict[str, Any]] = None,
+) -> AuditLog:
     """
-    Uygulama içinde kullanacağımız ana logging fonksiyonu.
+    Audit log kaydı oluşturur.
+    detail dict ise JSON string'e çevrilir.
     """
-    add_audit_log(
+    detail_str = json.dumps(details, ensure_ascii=False) if details is not None else None
+
+    log = AuditLog(
         user_id=user_id,
         action=action,
-        details=details or {},
+        entity_type=entity_type,
+        entity_id=entity_id,
+        details=detail_str,
     )
+    return add_audit_log(log)
 
 
-def get_recent_logs(limit: int = 100) -> list[AuditLog]:
+def get_recent_logs(limit: int = 100) -> List[AuditLog]:
     """
-    Admin panel için son log'ları döner.
+    Son audit log kayıtlarını döner.
+    /admin/audit-logs endpoint'i bunu kullanıyor.
     """
-    return list_recent_audit_logs(limit=limit)
+    return get_audit_logs(limit=limit)

@@ -1,19 +1,20 @@
 # app/domain/schemas/audit.py
 
-from __future__ import annotations
-
-from datetime import datetime
-from typing import Any, Optional
-
-from pydantic import BaseModel, Field
+from typing import Optional
+from pydantic import BaseModel
 
 
 class AuditLog(BaseModel):
     id: Optional[int] = None
-    user_id: int
+    user_id: Optional[int] = None
     action: str
-    details: dict[str, Any] = Field(default_factory=dict)
-    created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    # 🔹 yeni eklediğimiz alanlar:
+    entity_type: Optional[str] = None
+    entity_id: Optional[int] = None
+
+    # DB'de JSON string olarak saklıyoruz
+    details: Optional[str] = None
+
+    # SQLite genelde TEXT timestamp döndürüyor (CURRENT_TIMESTAMP)
+    created_at: Optional[str] = None
