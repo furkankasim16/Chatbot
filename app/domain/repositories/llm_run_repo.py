@@ -1,6 +1,8 @@
+
 # app/domain/repositories/llm_run_repo.py
 
-from typing import List, Optional
+from typing import Any, List,Dict, Optional
+
 from app.core.db import app_cursor
 from app.domain.schemas.llm_run import LLMRun
 
@@ -90,3 +92,43 @@ def list_llm_runs(limit: int = 100) -> List[LLMRun]:
         items.append(LLMRun(**data))
 
     return items
+
+def get_llm_stats_summary() -> List[Dict[str, Any]]:
+    """
+    llm_generation_runs tablosundan model bazlı latency ve token istatistikleri döner.
+    """
+    result: List[Dict[str, Any]] = []
+
+    with app_cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+                model_name,
+                COUNT(*) AS total_calls,
+                AVG(latency_ms) AS avg_latency_ms,
+                MIN(latency_ms) AS min_latency_ms,
+                MAX(latency_ms) AS max_latency_ms,
+                AVG(COALESCE(token_input, 0)) AS avg_input_tokens,
+                AVG(COALESCE(token_output, 0)) AS avg_output_tokens
+            FROM llm_generation_runs
+            GROUP BY model_name
+            ORDER BY model_name;
+            """
+        )
+
+        rows = cursor.fetchall()
+
+        for row in rows:
+            result.append(
+                {
+                    "model_name": row["model_name"],
+                    "total_calls": row["total_calls"],
+                    "avg_latency_ms": float(row["avg_latency_ms"]) if row["avg_latency_ms"] is not None else None,
+                    "min_latency_ms": row["min_latency_ms"],
+                    "max_latency_ms": row["max_latency_ms"],
+                    "avg_input_tokens": float(row["avg_input_tokens"]) if row["avg_input_tokens"] is not None else None,
+                    "avg_output_tokens": float(row["avg_output_tokens"]) if row["avg_output_tokens"] is not None else None,
+                }
+            )
+
+    return result

@@ -61,7 +61,7 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
       onStartQuiz({ mode: selectedMode, topic, difficulty, useOllama })
     }
   }
-  
+
   const modes = [
     {
       id: "quick" as QuizMode,
@@ -216,6 +216,8 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
                   <SelectItem value="beginner">Beginner</SelectItem>
                   <SelectItem value="intermediate">Intermediate</SelectItem>
                   <SelectItem value="advanced">Advanced</SelectItem>
+                  {/* 🔥 Yeni mixed seviye */}
+                  <SelectItem value="mixed">Mixed (All Levels)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -246,7 +248,9 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
             size="lg"
             disabled={selectedMode === "daily" && !isDailyAvailable}
           >
-            {selectedMode === "daily" && !isDailyAvailable ? `Available in ${nextDailyTime}` : "Start Quiz"}
+            {selectedMode === "daily" && !isDailyAvailable
+              ? `Available in ${nextDailyTime}`
+              : "Start Quiz"}
           </Button>
         </Card>
       )}

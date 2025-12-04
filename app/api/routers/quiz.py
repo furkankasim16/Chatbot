@@ -2,43 +2,48 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-from pytest import Session
-import requests,os,json
+import requests, os, json
+import re
 import re as regex
-from app.api.deps import on_start_app_db, on_start_questions_db
+import sqlite3
+from typing import Union
+from app.api.deps import on_start_app_db, on_start_questions_db, get_current_user
 from app.core.db import app_cursor
 from app.domain.schemas.quiz import QuizStartIn, QuizEndIn, QuestionTimingIn, TimeEventIn
 from app.domain.repositories.quiz_repo import add_time_event, create_attempt, end_attempt, add_question_timing
-from app.domain.repositories.quesitons_repo import get_random
-from app.domain.schemas.question import Question
+from app.domain.repositories.quesitons_repo import get_random, map_level_to_db_difficulty
+from app.domain.schemas.question import QuestionModel, QuestionType
 from app.core.config import settings
-from app.api.deps import get_current_user
-import sqlite3
-from src.auth import get_db  
 from app.core.paths import APP_DB, QUESTIONS_DB
 from app.domain.services.audit_service import log_action
 
+LEVEL_TO_DIFFICULTY = {
+    "beginner": "easy",
+    "intermediate": "medium",
+    "advanced": "hard",
+}
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:instruct")  # qwen2.5:7b da olur
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3:instruct")
 DB_PATH = APP_DB
+
 PROMPT_TEMPLATE = """
 You are a strict quiz generator. Return STRICT JSON only, no prose.
 
 Schema:
-{{
+{
   "questions": [
-    {{
+    {
       "topic": "<string>",
       "level": "<beginner|intermediate|advanced>",
       "qtype": "<mcq|truefalse|short>",
       "question": "<string>",
       "options": ["<string>", "<string>", "<string>", "<string>"],
       "answer": "<string>",
-      "meta": {{"source":"ollama","lang":"tr"}}
-    }}
+      "meta": {"source":"ollama","lang":"tr"}
+    }
   ]
-}}
+}
 
 Constraints:
 - Language: Turkish
@@ -51,6 +56,34 @@ Constraints:
 Generate now.
 """.strip()
 
+# 🔥 LLM tabanlı değerlendirme prompt'u
+LLM_EVAL_PROMPT = """
+You are a strict exam grader.
+
+You will receive:
+- The question
+- (Optionally) the expected/ideal answer
+- The student's answer
+
+You must return STRICT JSON ONLY, with this schema:
+
+{
+  "score": 1-5,
+  "is_correct": true or false,
+  "feedback": "<short explanation in Turkish>"
+}
+
+Scoring rules:
+- 5: Completely correct, excellent explanation
+- 4: Mostly correct, small issues but acceptable
+- 3: Partially correct, important gaps
+- 2: Mostly incorrect, a few relevant points
+- 1: Completely incorrect or off-topic
+
+If no expected answer is provided, grade based on your own knowledge about the topic.
+NO extra text, NO markdown, ONLY JSON.
+""".strip()
+
 router = APIRouter(prefix="/quiz")
 
 # --------------------------
@@ -60,23 +93,26 @@ class QuizBuildIn(BaseModel):
     topic: str
     level: str = "beginner"
     n: int = 5
-    qtype: str = "mcq"              # varsa kullan
-    use_ollama: bool = False        # << eklendi
+    qtype: str = "mcq"
+    use_ollama: bool = False
+
 
 class QuizAttemptStartRequest(BaseModel):
     topic: str
     difficulty: str
     total_questions: int
     start_time: datetime
-    mode: str | None = None
+    mode: Optional[str] = None
+
 
 class QuizAttemptEndRequest(BaseModel):
     attempt_id: int
     correct_answers: int
     score: float
     total_duration_ms: int
-    client_end_time: datetime | None = None 
-    questions_attempted: Optional[str] = None   
+    client_end_time: Optional[datetime] = None
+    questions_attempted: Optional[str] = None
+
 
 class QuizQuestionOut(BaseModel):
     id: Optional[int] = None
@@ -88,37 +124,78 @@ class QuizQuestionOut(BaseModel):
     answer: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
 
+
 class QuizBuildOut(BaseModel):
     items: List[QuizQuestionOut]
     shuffle: bool = True
+
 
 class QuizStartOut(BaseModel):
     attempt_id: int
     start_time: str
 
+
 class TimingStartOut(BaseModel):
     timing_id: int
     start_time: str
 
+
 class OkOut(BaseModel):
     ok: bool = True
+
 
 class QuestionTimingStartRequest(BaseModel):
     attempt_id: int
     question_id: str
-    client_start_time: datetime | None = None  # opsiyonel
+    client_start_time: Optional[datetime] = None
+
 
 class QuestionTimingEndRequest(BaseModel):
     timing_id: int
-    client_end_time: datetime | None = None    # opsiyonel
+    client_end_time: Optional[datetime] = None
 
+
+class EvaluateAnswerIn(BaseModel):
+    # ⚠️ Frontend ile birebir aynı isimler:
+    # body: { question, expected, user_answer }
+    question: str
+    expected: Optional[str] = None
+    user_answer: str
+
+
+class EvaluateAnswerOut(BaseModel):
+    is_correct: bool
+    score: Optional[float] = None
+    feedback: Optional[str] = None
+
+class QuestionResultDetail(BaseModel):
+    question_id: str
+    stem: str
+    user_answer: Union[str, List[str]]
+    correct_answer: Union[str, List[str]]
+    is_correct: bool
+    eval_score: Optional[float] = None
+    eval_feedback: Optional[str] = None
+
+
+class QuizAttemptHistoryOut(BaseModel):
+    id: int
+    quiz_date: str
+    topic: Optional[str] = None
+    difficulty: Optional[str] = None
+    total_questions: int
+    correct_answers: int
+    score: float
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    questions: Optional[List[QuestionResultDetail]] = None
 
 # --------------------------
 # Helpers
 # --------------------------
-
 def _render_prompt(topic: str, level: str, qtype: str, count: int) -> str:
     return PROMPT_TEMPLATE.format(topic=topic, level=level, qtype=qtype, count=count)
+
 
 def _parse_ollama_json(text: str):
     t = (text or "").strip()
@@ -128,11 +205,12 @@ def _parse_ollama_json(text: str):
     try:
         return json.loads(t)
     except json.JSONDecodeError:
-        fixed = regex.sub(r"(?<!\\)'", '"', t)  # tek tırnakları düzelt
+        fixed = regex.sub(r"(?<!\\)'", '"', t)
         return json.loads(fixed)
 
+
 def generate_questions_via_ollama(topic: str, level: str, qtype: str, count: int):
-    payload = {     
+    payload = {
         "model": OLLAMA_MODEL,
         "prompt": _render_prompt(topic, level, qtype, count),
         "stream": False,
@@ -147,11 +225,8 @@ def generate_questions_via_ollama(topic: str, level: str, qtype: str, count: int
         return data
     return []
 
+
 def _get_id_safe(q: Any) -> Optional[int]:
-    """
-    Question objesi (Pydantic/ORM) veya dict olabilir.
-    Güvenli şekilde id'yi int olarak döndür.
-    """
     val = None
     if isinstance(q, dict):
         val = q.get("id")
@@ -164,147 +239,176 @@ def _get_id_safe(q: Any) -> Optional[int]:
     except (TypeError, ValueError):
         return None
 
+
 def _normalize_q(q: Any) -> Dict[str, Any]:
-    """
-    Çıkışı dict'e normalize et (UI için stabil şema).
-    DB kayıtları: stem, choices, answer_index, type
-    LLM kayıtları: question, options, answer, qtype
-    """
-    # 1) dict ise doğrudan kopyasını al
+    # 1) dict
     if isinstance(q, dict):
-        y = dict(q)  # kopya
+        y = dict(q)
 
-        # type -> qtype
-        if "qtype" not in y and "type" in y:
-            y["qtype"] = y.pop("type")
+        if "type" not in y:
+            if "question_type" in y:
+                y["type"] = y["question_type"]
+            elif "qtype" in y:
+                y["type"] = y["qtype"]
 
-        # stem -> question
-        if not y.get("question") and y.get("stem"):
-            y["question"] = y["stem"]
+        if not y.get("stem") and y.get("question"):
+            y["stem"] = y["question"]
 
-        # choices -> options
         if not y.get("options") and y.get("choices"):
             y["options"] = y["choices"]
 
-        # answer_index -> answer (metin)
-        if not y.get("answer"):
+        answer = y.get("answer")
+        options = y.get("options")
+        if answer is None and isinstance(options, list):
             ans_idx = y.get("answer_index")
-            opts = y.get("options")
-            if isinstance(ans_idx, int) and isinstance(opts, list) and 0 <= ans_idx < len(opts):
-                y["answer"] = opts[ans_idx]
+            if isinstance(ans_idx, int) and 0 <= ans_idx < len(options):
+                answer = options[ans_idx]
 
-        # meta güvenliği
+        if answer is None and isinstance(options, list):
+            idxs = y.get("correct_option_indexes")
+            if isinstance(idxs, list) and idxs:
+                idx = idxs[0]
+                if isinstance(idx, int) and 0 <= idx < len(options):
+                    answer = options[idx]
+
+        if answer is not None:
+            y["answer"] = answer
+
         meta = y.get("meta") or {}
         meta.setdefault("lang", "tr")
         y["meta"] = meta
 
-        # minimum garanti: question boş kalmasın (response_model zorunlu)
         if not y.get("question"):
-            y["question"] = "—"
+            y["question"] = y.get("stem") or "—"
 
         return y
 
-    # 2) Pydantic ise
+    # 2) Pydantic model
     if hasattr(q, "model_dump"):
         y = q.model_dump()
-        # type -> qtype gibi küçük eşitlemeler
-        if "qtype" not in y and "type" in y:
-            y["qtype"] = y.pop("type")
-        if not y.get("question") and y.get("stem"):
-            y["question"] = y["stem"]
+
+        if "type" not in y:
+            if "question_type" in y:
+                y["type"] = y["question_type"]
+            elif "qtype" in y:
+                y["type"] = y["qtype"]
+
+        if not y.get("stem") and y.get("question"):
+            y["stem"] = y["question"]
+
         if not y.get("options") and y.get("choices"):
             y["options"] = y["choices"]
-        if not y.get("answer"):
+
+        options = y.get("options")
+        answer = y.get("answer")
+        if answer is None and isinstance(options, list):
             ans_idx = y.get("answer_index")
-            opts = y.get("options")
-            if isinstance(ans_idx, int) and isinstance(opts, list) and 0 <= ans_idx < len(opts):
-                y["answer"] = opts[ans_idx]
+            if isinstance(ans_idx, int) and 0 <= ans_idx < len(options):
+                answer = options[ans_idx]
+
+        if answer is None and isinstance(options, list):
+            idxs = y.get("correct_option_indexes")
+            if isinstance(idxs, list) and idxs:
+                idx = idxs[0]
+                if isinstance(idx, int) and 0 <= idx < len(options):
+                    answer = options[idx]
+
+        if answer is not None:
+            y["answer"] = answer
+
         y.setdefault("meta", {"lang": "tr"})
         if not y.get("question"):
-            y["question"] = "—"
+            y["question"] = y.get("stem") or "—"
         return y
 
-    # 3) ORM/başka tip ise alanları elde etmeye çalış
+    # 3) fallback
     y = {
         "id": getattr(q, "id", None),
         "topic": getattr(q, "topic", None),
         "level": getattr(q, "level", None),
-        "qtype": getattr(q, "qtype", None) or getattr(q, "type", None),
-        "question": getattr(q, "question", None) or getattr(q, "stem", None),
+        "type": getattr(q, "type", None) or getattr(q, "question_type", None),
+        "stem": getattr(q, "stem", None) or getattr(q, "question", None),
         "options": getattr(q, "options", None) or getattr(q, "choices", None),
         "answer": getattr(q, "answer", None),
         "meta": getattr(q, "meta", None) or {"lang": "tr"},
     }
-    # answer_index -> answer
+
+    options = y.get("options")
     ans_idx = getattr(q, "answer_index", None)
-    if y.get("answer") is None and isinstance(ans_idx, int) and isinstance(y.get("options"), list):
-        if 0 <= ans_idx < len(y["options"]):
-            y["answer"] = y["options"][ans_idx]
-    if not y.get("question"):
-        y["question"] = "—"
+    if y.get("answer") is None and isinstance(ans_idx, int) and isinstance(options, list):
+        if 0 <= ans_idx < len(options):
+            y["answer"] = options[ans_idx]
+
+    if not y.get("stem"):
+        y["stem"] = "—"
+
     return y
 
 
 # --------------------------
-# Quiz Build (Soru seti)
+# Quiz Build
 # --------------------------
-
 @router.post("/", response_model=QuizBuildOut)
 def build_quiz(data: QuizBuildIn, _=Depends(on_start_questions_db)):
+
     if data.use_ollama:
         items = generate_questions_via_ollama(
-            topic=data.topic, level=data.level, qtype=data.qtype, count=data.n
+            topic=data.topic,
+            level=data.level,
+            qtype=data.qtype,
+            count=data.n,
         )
-        normalized = []
+        out = []
         for q in items:
             q = dict(q)
             q.setdefault("topic", data.topic)
             q.setdefault("level", data.level)
             q.setdefault("qtype", data.qtype)
+
             meta = q.get("meta") or {}
             meta.setdefault("source", "ollama")
             meta.setdefault("lang", "tr")
             q["meta"] = meta
-            normalized.append(_normalize_q(q))  # senin mevcut normalize fonksiyonun
-        return {"items": normalized, "shuffle": True}
 
-    # mevcut DB yolu (aynı kalsın)
-    items: List[Dict[str, Any]] = []
-    exclude: List[int] = []
-    for _i in range(data.n):
-        q = get_random(topic=data.topic, level=data.level, exclude_ids=exclude)
-        if not q: break
-        qid = _get_id_safe(q)
-        if qid is not None:
-            exclude.append(qid)
-        items.append(_normalize_q(q))
-    return {"items": items, "shuffle": True}
+            out.append(_normalize_q(q))
 
-    # aksi halde ESKİ DB YOLU (mevcut kodun aynen kalsın)
-    items: List[Dict[str, Any]] = []
+        return {"items": out, "shuffle": True}
+
     exclude: List[int] = []
-    for _i in range(data.n):
-        q = get_random(topic=data.topic, level=data.level, exclude_ids=exclude)
+    items: List[dict] = []
+
+    db_difficulty = map_level_to_db_difficulty(data.level)
+
+    for _ in range(data.n):
+        q = get_random(
+            topic=data.topic,
+            difficulty=db_difficulty,
+            exclude_ids=exclude,
+        )
         if not q:
             break
-        qid = _get_id_safe(q)
+
+        qid = getattr(q, "id", None)
         if qid is not None:
             exclude.append(qid)
+
         items.append(_normalize_q(q))
+
     return {"items": items, "shuffle": True}
 
+
 # --------------------------
-# Quiz Attempt (başlangıç/bitiş)
+# Quiz Attempt (start/end)
 # --------------------------
 @router.post("/attempt/start")
 def start_quiz_attempt(
     payload: QuizAttemptStartRequest,
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     quiz_date = payload.start_time.date().isoformat()
     start_time_str = payload.start_time.isoformat()
 
-    user_id = getattr(current_user, "id", current_user["id"])
+    user_id = getattr(current_user, "id", current_user.get("id"))
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -335,7 +439,6 @@ def start_quiz_attempt(
     conn.commit()
     conn.close()
 
-    # 🔹 Audit log
     log_action(
         user_id=user_id,
         action="QUIZ_ATTEMPT_START",
@@ -389,7 +492,6 @@ def end_quiz_attempt(payload: QuizAttemptEndRequest, current=Depends(get_current
             ),
         )
 
-    # 🔹 Audit log
     log_action(
         user_id=user_id,
         action="QUIZ_ATTEMPT_END",
@@ -407,12 +509,12 @@ def end_quiz_attempt(payload: QuizAttemptEndRequest, current=Depends(get_current
 
 
 # --------------------------
-# Question Timing (başlangıç/bitiş)
+# Question Timing
 # --------------------------
 @router.post("/question/start")
 def start_question_timing(
     payload: QuestionTimingStartRequest,
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -436,8 +538,7 @@ def start_question_timing(
     conn.commit()
     conn.close()
 
-    # 🔹 Audit log
-    user_id = getattr(current_user, "id", current_user["id"])
+    user_id = getattr(current_user, "id", current_user.get("id"))
     log_action(
         user_id=user_id,
         action="QUIZ_QUESTION_TIMING_START",
@@ -455,7 +556,7 @@ def start_question_timing(
 @router.post("/question/end")
 def end_question_timing(
     payload: QuestionTimingEndRequest,
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -496,8 +597,7 @@ def end_question_timing(
     conn.commit()
     conn.close()
 
-    # 🔹 Audit log
-    user_id = getattr(current_user, "id", current_user["id"])
+    user_id = getattr(current_user, "id", current_user.get("id"))
     log_action(
         user_id=user_id,
         action="QUIZ_QUESTION_TIMING_END",
@@ -511,7 +611,6 @@ def end_question_timing(
     return {"success": True}
 
 
-
 # --------------------------
 # Genel Zaman Olayları
 # --------------------------
@@ -519,3 +618,217 @@ def end_question_timing(
 def time_event(data: TimeEventIn, _=Depends(on_start_app_db)):
     add_time_event(data.model_dump())
     return {"ok": True}
+
+
+# --------------------------
+# Evaluate Answer (open-ended / scenario)
+# --------------------------
+def _normalize_answer(text: str) -> str:
+    """
+    Cevapları kıyaslamadan önce normalize et:
+    - lowercase
+    - baş/son boşlukları sil
+    - noktalama işaretlerini kaldır
+    - çoklu boşlukları tek boşluğa indir
+    """
+    text = text.lower().strip()
+    text = re.sub(r"[.,!?;:]", "", text)
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def _word_overlap_score(a: str, b: str) -> float:
+    """
+    İki cümle arasındaki kelime kesişimini oran olarak döndür (0.0–1.0).
+    """
+    a_norm = _normalize_answer(a)
+    b_norm = _normalize_answer(b)
+
+    if not a_norm or not b_norm:
+        return 0.0
+
+    a_words = set(a_norm.split())
+    b_words = set(b_norm.split())
+
+    if not a_words or not b_words:
+        return 0.0
+
+    overlap = len(a_words & b_words)
+    union = len(a_words | b_words)
+    return overlap / union
+
+
+@router.post("/evaluate-answer", response_model=EvaluateAnswerOut)
+def evaluate_answer_endpoint(
+    payload: EvaluateAnswerIn,
+    current_user=Depends(get_current_user),
+):
+    """
+    Açık uçlu / senaryo soruları için LLM tabanlı değerlendirme.
+    Hata olursa kelime benzerliği fallback'ine düşer.
+
+    Frontend'den gelen body:
+    {
+      "question": "...",
+      "expected": "...",       # optional
+      "user_answer": "..."
+    }
+    """
+    expected = payload.expected or ""
+    user_answer = payload.user_answer or ""
+
+    # 1) Önce LLM ile değerlendirmeyi dene
+    try:
+        prompt = f"""{LLM_EVAL_PROMPT}
+
+QUESTION:
+{payload.question}
+
+EXPECTED (optional):
+{expected or "N/A"}
+
+STUDENT_ANSWER:
+{user_answer}
+"""
+
+        r = requests.post(
+            f"{OLLAMA_HOST}/api/generate",
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.0},
+            },
+            timeout=60,
+        )
+        r.raise_for_status()
+        raw = r.json().get("response", "") or ""
+        data = _parse_ollama_json(raw)
+
+        score = float(data.get("score", 3))
+        is_correct = bool(data.get("is_correct", score >= 4))
+        feedback = data.get("feedback") or "LLM değerlendirmesi tamamlandı."
+
+        return EvaluateAnswerOut(
+            score=score,
+            is_correct=is_correct,
+            feedback=feedback,
+        )
+
+    except Exception as e:
+        # 2) Hata olursa eski kelime-benzerliği fallback'ine dön
+        sim = _word_overlap_score(expected, user_answer) if expected else 0.0
+
+        if sim >= 0.8:
+            score = 5
+        elif sim >= 0.6:
+            score = 4
+        elif sim >= 0.4:
+            score = 3
+        elif sim >= 0.2:
+            score = 2
+        else:
+            score = 1
+
+        is_correct = score >= 4
+
+        feedback_parts: list[str] = []
+        feedback_parts.append(f"[Fallback] Similarity score: {sim:.2f}")
+        if is_correct:
+            feedback_parts.append("Your answer is close enough to the expected answer.")
+        else:
+            feedback_parts.append("Your answer differs significantly from the expected answer.")
+
+        feedback = " ".join(feedback_parts)
+
+        return EvaluateAnswerOut(
+            score=score,
+            is_correct=is_correct,
+            feedback=feedback,
+        )
+
+
+@router.get("/attempts/recent", response_model=List[QuizAttemptHistoryOut])
+def get_recent_attempts(
+    limit: int = 10,
+    current_user=Depends(get_current_user),
+):
+    """
+    Aktif kullanıcının son N quiz denemesini döner.
+    questions_attempted kolonundaki JSON'u parse edip
+    QuestionResultDetail listesine çevirir.
+    """
+    user_id = getattr(current_user, "id", current_user.get("id"))
+
+    rows: list[tuple] = []
+    with app_cursor() as c:
+        rows = c.execute(
+            """
+            SELECT
+              id,
+              quiz_date,
+              topic,
+              difficulty,
+              total_questions,
+              correct_answers,
+              score,
+              start_time,
+              end_time,
+              questions_attempted
+            FROM quiz_attempts
+            WHERE user_id = ?
+            ORDER BY start_time DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+
+    attempts: List[QuizAttemptHistoryOut] = []
+
+    for row in rows:
+        (
+            attempt_id,
+            quiz_date,
+            topic,
+            difficulty,
+            total_questions,
+            correct_answers,
+            score,
+            start_time,
+            end_time,
+            questions_json,
+        ) = row
+
+        questions: Optional[List[QuestionResultDetail]] = None
+        if questions_json:
+            try:
+                raw = json.loads(questions_json)
+                if isinstance(raw, list):
+                    parsed: List[QuestionResultDetail] = []
+                    for item in raw:
+                        if isinstance(item, dict):
+                            try:
+                                parsed.append(QuestionResultDetail(**item))
+                            except Exception:
+                                # Bozuk item’ı atla
+                                continue
+                    questions = parsed
+            except Exception:
+                questions = None
+
+        attempts.append(
+            QuizAttemptHistoryOut(
+                id=attempt_id,
+                quiz_date=quiz_date,
+                topic=topic,
+                difficulty=difficulty,
+                total_questions=total_questions or 0,
+                correct_answers=correct_answers or 0,
+                score=float(score or 0),
+                start_time=start_time,
+                end_time=end_time,
+                questions=questions,
+            )
+        )
+
+    return attempts

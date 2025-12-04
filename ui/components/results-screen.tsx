@@ -2,33 +2,60 @@
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Trophy, RotateCcw, TrendingUp, AlertCircle, CheckCircle2, XCircle } from "lucide-react"
-import type { Question } from "@/app/page"
+import { Badge } from "@/components/ui/badge"
+import {
+  Trophy,
+  RotateCcw,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Sparkles,
+} from "lucide-react"
+import type { Question } from "@/app/types/quiz"
+
+interface QuestionResultDetail {
+  question_id: string
+  stem: string
+  user_answer: string | string[]
+  correct_answer: string | string[]
+  is_correct: boolean
+  eval_score?: number
+  eval_feedback?: string
+}
 
 interface ResultsScreenProps {
   questions: Question[]
   userAnswers: Record<string, string | string[]>
   onRestart: () => void
+  detailedResults?: QuestionResultDetail[] | null
 }
 
-function normalizeAnswer(answer: string): string {
-  return answer
+function normalizeAnswer(value: string | boolean | null | undefined): string {
+  let str: string
+
+  if (typeof value === "string") {
+    str = value
+  } else if (typeof value === "boolean") {
+    str = value ? "true" : "false"
+  } else {
+    str = ""
+  }
+
+  return str
     .toLowerCase()
     .trim()
-    .replace(/[.,!?;:]/g, "") // Noktalama işaretlerini kaldır
-    .replace(/\s+/g, " ") // Birden fazla boşluğu tek boşluğa çevir
+    .replace(/[.,!?;:]/g, "")
+    .replace(/\s+/g, " ")
 }
 
 function calculateSimilarity(str1: string, str2: string): number {
   const s1 = normalizeAnswer(str1)
   const s2 = normalizeAnswer(str2)
-
   if (s1 === s2) return 100
 
-  // Basit benzerlik hesaplama (Levenshtein benzeri)
   const longer = s1.length > s2.length ? s1 : s2
   const shorter = s1.length > s2.length ? s2 : s1
-
   if (longer.length === 0) return 100
 
   const editDistance = levenshteinDistance(longer, shorter)
@@ -37,58 +64,85 @@ function calculateSimilarity(str1: string, str2: string): number {
 
 function levenshteinDistance(str1: string, str2: string): number {
   const matrix: number[][] = []
-
-  for (let i = 0; i <= str2.length; i++) {
-    matrix[i] = [i]
-  }
-
-  for (let j = 0; j <= str1.length; j++) {
-    matrix[0][j] = j
-  }
+  for (let i = 0; i <= str2.length; i++) matrix[i] = [i]
+  for (let j = 0; j <= str1.length; j++) matrix[0][j] = j
 
   for (let i = 1; i <= str2.length; i++) {
     for (let j = 1; j <= str1.length; j++) {
-      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1]
-      } else {
-        matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
-      }
+      matrix[i][j] =
+        str2[i - 1] === str1[j - 1]
+          ? matrix[i - 1][j - 1]
+          : Math.min(
+              matrix[i - 1][j - 1] + 1,
+              matrix[i][j - 1] + 1,
+              matrix[i - 1][j] + 1,
+            )
     }
   }
-
   return matrix[str2.length][str1.length]
 }
 
-export function ResultsScreen({ questions, userAnswers, onRestart }: ResultsScreenProps) {
-  const autoGradedQuestions = questions.filter(
-    (q) => q.type === "mcq" || q.type === "true_false" || q.type === "short_answer",
+export function ResultsScreen({
+  questions,
+  userAnswers,
+  onRestart,
+  detailedResults,
+}: ResultsScreenProps) {
+  
+  const getDetail = (qid: string) =>
+    detailedResults?.find((d) => d.question_id === qid)
+
+  const autoGraded = questions.filter(
+    (q) => q.type === "mcq" || q.type === "true_false" || q.type === "short_answer"
   )
 
-  const manualReviewQuestions = questions.filter((q) => q.type === "open_ended" || q.type === "scenario")
+  const manualReview = questions.filter(
+    (q) => q.type === "open_ended" || q.type === "scenario"
+  )
 
-  const correctCount = autoGradedQuestions.filter((q) => {
-    const userAnswer = userAnswers[q.id]
-    if (!userAnswer) return false
+  const correctCount = autoGraded.reduce((acc, q) => {
+    const key = String(q.id)
+    const detail = getDetail(key)
+    if (detail) return detail.is_correct ? acc + 1 : acc
+
+    const userAnswer = userAnswers[key]
+    if (!userAnswer) return acc
+
+    const rawCorrect =
+      typeof q.correctAnswer === "string"
+        ? q.correctAnswer
+        : Array.isArray(q.correctAnswer)
+        ? q.correctAnswer[0]
+        : q.answer ?? ""
+
+    if (!rawCorrect) return acc
+
+    let isCorrect = false
 
     if (Array.isArray(userAnswer)) {
-      return JSON.stringify(userAnswer.sort()) === JSON.stringify((q.correctAnswer as string[]).sort())
+      isCorrect =
+        JSON.stringify([...userAnswer].sort()) ===
+        JSON.stringify([rawCorrect].sort())
+    } else if (q.type === "mcq" || q.type === "true_false") {
+      isCorrect = normalizeAnswer(userAnswer) === normalizeAnswer(rawCorrect)
+    } else {
+      isCorrect = calculateSimilarity(String(userAnswer), String(rawCorrect)) >= 85
     }
 
-    // MCQ ve True/False için tam eşleşme
-    if (q.type === "mcq" || q.type === "true_false") {
-      return normalizeAnswer(userAnswer) === normalizeAnswer(q.correctAnswer as string)
-    }
+    return isCorrect ? acc + 1 : acc
+  }, 0)
 
-    // Short answer için benzerlik kontrolü
-    const similarity = calculateSimilarity(userAnswer, q.correctAnswer as string)
-    return similarity >= 85 // %85 benzerlik yeterli
-  }).length
+  const percentage = autoGraded.length
+    ? Math.round((correctCount / autoGraded.length) * 100)
+    : 0
 
-  const percentage = autoGradedQuestions.length > 0 ? Math.round((correctCount / autoGradedQuestions.length) * 100) : 0
-  const status = percentage >= 80 ? "Excellent" : percentage >= 60 ? "Good" : "Keep Practicing"
+  const status =
+    percentage >= 80 ? "Excellent" : percentage >= 60 ? "Good" : "Keep Practicing"
 
   return (
     <div className="animate-fade-in space-y-6">
+      
+      {/* ---------------- Summary Card ---------------- */}
       <Card className="p-8 space-y-6 text-center">
         <div className="flex justify-center">
           <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
@@ -96,156 +150,94 @@ export function ResultsScreen({ questions, userAnswers, onRestart }: ResultsScre
           </div>
         </div>
 
-        <div className="space-y-2">
-          <h2 className="text-3xl font-bold text-card-foreground">Quiz Complete!</h2>
-          <p className="text-muted-foreground text-lg">Here's how you performed</p>
-        </div>
+        <h2 className="text-3xl font-bold">Quiz Complete!</h2>
+        <p className="text-muted-foreground text-lg">Here's how you performed</p>
 
-        {autoGradedQuestions.length > 0 && (
-          <>
-            <div className="py-6 space-y-4">
-              <div className="text-6xl font-bold text-primary">{percentage}%</div>
-              <div className="space-y-1">
-                <p className="text-xl font-semibold text-card-foreground">{status}</p>
-                <p className="text-muted-foreground">
-                  {correctCount} out of {autoGradedQuestions.length} correct
-                </p>
-              </div>
-            </div>
+        <div className="text-6xl font-bold text-primary">{percentage}%</div>
+        <p className="text-xl font-semibold">{status}</p>
+        <p className="text-muted-foreground">{correctCount} / {autoGraded.length} correct</p>
 
-            <div className="grid gap-4 md:grid-cols-3 pt-4">
-              <div className="p-4 rounded-lg bg-muted/50 space-y-1">
-                <p className="text-2xl font-bold text-accent">{correctCount}</p>
-                <p className="text-sm text-muted-foreground">Correct</p>
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50 space-y-1">
-                <p className="text-2xl font-bold text-destructive">{autoGradedQuestions.length - correctCount}</p>
-                <p className="text-sm text-muted-foreground">Incorrect</p>
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50 space-y-1">
-                <p className="text-2xl font-bold text-primary">{autoGradedQuestions.length}</p>
-                <p className="text-sm text-muted-foreground">Auto-Graded</p>
-              </div>
-            </div>
-          </>
-        )}
+        {/* ---------------- AI Evaluation Section ---------------- */}
+        {manualReview.length > 0 && detailedResults && (
+          <Card className="p-6 space-y-4 border-primary/30 bg-primary/5 mt-6">
+            <h3 className="text-lg font-semibold flex items-center gap-2 text-primary">
+              <Sparkles className="w-5 h-5" />
+              AI Evaluation Summary
+            </h3>
 
-        {manualReviewQuestions.length > 0 && (
-          <div className="pt-4 space-y-4">
-            <div className="flex items-center gap-2 justify-center text-muted-foreground">
-              <AlertCircle className="w-5 h-5" />
-              <p className="text-sm font-medium">
-                {manualReviewQuestions.length} question{manualReviewQuestions.length > 1 ? "s" : ""} require manual
-                review
-              </p>
-            </div>
+            {detailedResults
+              .filter((d) => manualReview.some((q) => String(q.id) === d.question_id))
+              .map((res) => (
+                <div key={res.question_id} className="p-4 bg-card border rounded-lg space-y-2">
+                  <p className="font-medium">{res.stem}</p>
 
-            <div className="space-y-3 text-left">
-              {manualReviewQuestions.map((q, index) => {
-                const userAnswer = userAnswers[q.id]
-                return (
-                  <Card key={q.id} className="p-4 space-y-3">
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2">
-                        <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-primary/10 text-primary">
-                          {q.type === "scenario" ? "Scenario" : "Open Ended"}
-                        </span>
-                      </div>
-                      <p className="text-sm font-medium text-card-foreground">{q.stem}</p>
-                    </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge variant={res.is_correct ? "default" : "destructive"}>
+                      {res.is_correct ? "AI Marked Correct" : "Needs Improvement"}
+                    </Badge>
 
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Your Answer:</p>
-                      <div className="p-3 rounded-lg bg-muted/50 text-sm text-card-foreground leading-relaxed">
-                        {Array.isArray(userAnswer)
-                          ? userAnswer.map((ans, i) => (
-                              <div key={i} className="mb-2 last:mb-0">
-                                <span className="font-medium">Step {i + 1}:</span> {ans}
-                              </div>
-                            ))
-                          : userAnswer || "No answer provided"}
-                      </div>
-                    </div>
-
-                    {q.correctAnswer && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground">Sample Answer:</p>
-                        <div className="p-3 rounded-lg bg-accent/5 text-sm text-card-foreground leading-relaxed">
-                          {Array.isArray(q.correctAnswer)
-                            ? q.correctAnswer.map((ans, i) => (
-                                <div key={i} className="mb-2 last:mb-0">
-                                  <span className="font-medium">Step {i + 1}:</span> {ans}
-                                </div>
-                              ))
-                            : q.correctAnswer}
-                        </div>
-                      </div>
+                    {res.eval_score !== undefined && (
+                      <Badge variant="outline">Score: {res.eval_score}/5</Badge>
                     )}
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
+                  </div>
+
+                  {res.eval_feedback && (
+                    <p className="text-xs text-muted-foreground border-l pl-3 italic">
+                      {res.eval_feedback}
+                    </p>
+                  )}
+                </div>
+              ))}
+          </Card>
         )}
 
-        <div className="pt-4 space-y-3">
-          <Button onClick={onRestart} className="w-full h-12 text-base font-medium" size="lg">
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Start New Quiz
-          </Button>
-
-          {percentage < 80 && autoGradedQuestions.length > 0 && (
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
-              <TrendingUp className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-muted-foreground leading-relaxed text-left">
-                Review the explanations and source materials to improve your understanding. Practice makes perfect!
-              </p>
-            </div>
-          )}
-        </div>
+        <Button onClick={onRestart} className="w-full mt-6">Start New Quiz</Button>
       </Card>
 
-      {autoGradedQuestions.length > 0 && (
+      {/* ---------------- Answer Review (Auto-Graded) ---------------- */}
+      {autoGraded.length > 0 && (
         <Card className="p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-card-foreground">Answer Review</h3>
-          <div className="space-y-3">
-            {autoGradedQuestions.map((q, index) => {
-              const userAnswer = userAnswers[q.id]
-              const isCorrect = (() => {
-                if (!userAnswer) return false
-                if (Array.isArray(userAnswer)) {
-                  return JSON.stringify(userAnswer.sort()) === JSON.stringify((q.correctAnswer as string[]).sort())
-                }
-                if (q.type === "mcq" || q.type === "true_false") {
-                  return normalizeAnswer(userAnswer) === normalizeAnswer(q.correctAnswer as string)
-                }
-                return calculateSimilarity(userAnswer, q.correctAnswer as string) >= 85
-              })()
+          <h3 className="text-lg font-semibold">Answer Review</h3>
 
-              return (
-                <div key={q.id} className="flex items-start gap-3 p-4 rounded-lg border border-border">
-                  {isCorrect ? (
-                    <CheckCircle2 className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+          {autoGraded.map((q) => {
+            const key = String(q.id)
+            const userAnswer = userAnswers[key]
+            const detail = getDetail(key)
+
+            const rawCorrect =
+              typeof q.correctAnswer === "string"
+                ? q.correctAnswer
+                : Array.isArray(q.correctAnswer)
+                ? q.correctAnswer[0]
+                : q.answer ?? ""
+
+            const isCorrect = detail?.is_correct ?? (
+              userAnswer &&
+              normalizeAnswer(String(userAnswer)) === normalizeAnswer(String(rawCorrect))
+            )
+
+            return (
+              <div key={key} className="p-4 rounded-lg border flex gap-3">
+                {isCorrect ? (
+                  <CheckCircle2 className="w-5 h-5 text-accent" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-destructive" />
+                )}
+
+                <div className="flex-1">
+                  <p className="font-medium">{q.stem}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Your answer: {String(userAnswer ?? "No answer")}
+                  </p>
+                  {!isCorrect && (
+                    <p className="text-xs text-muted-foreground">
+                      Correct: <span className="text-accent">{String(rawCorrect)}</span>
+                    </p>
                   )}
-                  <div className="flex-1 space-y-2 text-left">
-                    <p className="text-sm font-medium text-card-foreground">{q.stem}</p>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        Your answer: <span className="text-card-foreground">{userAnswer || "No answer"}</span>
-                      </p>
-                      {!isCorrect && (
-                        <p className="text-xs text-muted-foreground">
-                          Correct answer: <span className="text-accent">{q.correctAnswer as string}</span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )
+          })}
         </Card>
       )}
     </div>

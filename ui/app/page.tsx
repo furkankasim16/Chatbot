@@ -11,9 +11,9 @@ import { AdminPanel } from "@/components/admin-panel"
 import { UserMenu } from "@/components/user-menu"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { ChatScreen } from "@/components/chat-screen"
-import { useQuizTimer } from "@/hooks/use-quiz-timer"           // ✅ dosya adıyla uyumlu
-// ❗ Question/QuestionType tek kaynaktan gelsin
+import { useQuizTimer } from "@/hooks/use-quiz-timer"
 import type { Question, QuestionType } from "@/app/types/quiz"
+import type { Question as APIQuestion, UserStats, LoginResponse, EvaluateAnswerResponse } from "@/lib/api"
 
 import {
   getQuestionsFromDB,
@@ -27,9 +27,7 @@ import {
   endQuizTiming,
   startQuestionTiming,
   endQuestionTiming,
-  type Question as APIQuestion,
-  type UserStats,
-  type LoginResponse,
+
 } from "@/lib/api"
 
 import { Loader2, AlertCircle, Sparkles, Clock } from "lucide-react"
@@ -37,9 +35,9 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-// ⚠️ Buradaki union tipleri yerel olarak kalabilir, Question ile çakışmaz
 export type QuizMode = "quick" | "daily" | "scenario"
-export type Difficulty = "beginner" | "intermediate" | "advanced"
+export type Difficulty = "beginner" | "intermediate" | "advanced" | "mixed"
+
 
 export interface QuizConfig {
   mode: QuizMode
@@ -53,11 +51,10 @@ interface ExtendedLoginResponse extends LoginResponse {
   user_id?: number
 }
 
-/* ------------------------- YALNIZCA TEK DEFAULT EXPORT ------------------------- */
 export default function QuizWidget() {
-  const [screen, setScreen] = useState<"auth" | "home" | "quiz" | "feedback" | "results" | "stats" | "admin" | "chat">(
-    "auth",
-  )
+  const [screen, setScreen] = useState<
+    "auth" | "home" | "quiz" | "feedback" | "results" | "stats" | "admin" | "chat"
+  >("auth")
   const [config, setConfig] = useState<QuizConfig | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [userAnswers, setUserAnswers] = useState<Record<string, string | string[]>>({})
@@ -73,6 +70,28 @@ export default function QuizWidget() {
   const timer = useQuizTimer()
   const [quizAttemptId, setQuizAttemptId] = useState<number | null>(null)
   const [currentQuestionTimingId, setCurrentQuestionTimingId] = useState<number | null>(null)
+    const [currentEvaluation, setCurrentEvaluation] =
+    useState<EvaluateAnswerResponse | null>(null)
+
+  const [evalResults, setEvalResults] = useState<
+    Record<string, EvaluateAnswerResponse>
+  >({})
+
+  const [detailedResults, setDetailedResults] = useState<
+    QuestionResultDetail[] | null
+  >(null)
+
+
+  type QuestionResultDetail = {
+  question_id: string
+  stem: string
+  user_answer: string | string[]
+  correct_answer: string | string[]
+  is_correct: boolean
+  eval_score?: number
+  eval_feedback?: string
+}
+
 
   useEffect(() => {
     const savedToken = localStorage.getItem("auth_token")
@@ -80,7 +99,12 @@ export default function QuizWidget() {
     const savedIsAdmin = localStorage.getItem("is_admin") === "true"
 
     if (savedToken && savedUsername) {
-      setUser({ access_token: savedToken, token_type: "bearer", username: savedUsername, is_admin: savedIsAdmin })
+      setUser({
+        access_token: savedToken,
+        token_type: "bearer",
+        username: savedUsername,
+        is_admin: savedIsAdmin,
+      })
       setScreen("home")
       loadUserStats(savedToken)
     }
@@ -94,85 +118,83 @@ export default function QuizWidget() {
       console.error("[v0] Failed to load user stats:", error)
     }
   }
-  
 
   const handleStartQuiz = async (quizConfig: QuizConfig) => {
-  setConfig(quizConfig)
-  setCurrentQuestionIndex(0)
-  setUserAnswers({})
-  setShowFeedback(false)
-  setIsLoading(true)
-  setError(null)
+    setConfig(quizConfig)
+    setCurrentQuestionIndex(0)
+    setUserAnswers({})
+    setShowFeedback(false)
+    setIsLoading(true)
+    setError(null)
 
-  const controller = new AbortController()
-  setAbortController(controller)
+    const controller = new AbortController()
+    setAbortController(controller)
 
-  console.log("[v0] Starting quiz with config:", quizConfig)
+    console.log("[v0] Starting quiz with config:", quizConfig)
 
-  try {
-    const questionCount =
-      quizConfig.mode === "daily" ? 1 : quizConfig.mode === "quick" ? 5 : 3;
+    try {
+      const questionCount = quizConfig.mode === "daily" ? 1 : quizConfig.mode === "quick" ? 5 : 3
 
-    let apiQuestions: APIQuestion[]
+      let apiQuestions: APIQuestion[]
 
-    if (quizConfig.useOllama) {
-      console.log("[v0] Using Ollama to generate questions...")
-      const quizResponse = await generateQuiz(
-        quizConfig.topic,
-        quizConfig.difficulty,
-        questionCount,
-        true,
-        "mcq",
-      )
-      apiQuestions = quizResponse.items
-    } else {
-      console.log("[v0] Fetching questions from database...")
-      apiQuestions = await getQuestionsFromDB(
-        quizConfig.topic,
-        quizConfig.difficulty,
-        questionCount,
-      )
-    }
-
-    setQuestions(apiQuestions.map(convertAPIQuestionToLocal))
-
-    if (user) {
-      try {
-        console.log("[v0] [TIMING] Calling startQuizTiming API...")
-
-        const payload = {
-        topic: quizConfig.topic,
-        difficulty: quizConfig.difficulty,
-        total_questions: questionCount,
-        start_time: new Date().toISOString(),
-        mode: quizConfig.mode,
-      };
-
-        console.log("[v0] [TIMING] payload:", payload)
-
-        const quizStart = await startQuizTiming(user.access_token, payload);
-        setQuizAttemptId(quizStart.attempt_id);
-        timer.startQuiz();
-        console.log("[v0] [TIMING] timer.startQuiz() called successfully")
-      } catch (error) {
-        console.error("[v0] [TIMING] Failed to start quiz timing:", error)
+      if (quizConfig.useOllama) {
+        console.log("[v0] Using Ollama to generate questions...")
+        const quizResponse = await generateQuiz(
+          quizConfig.topic,
+          quizConfig.difficulty,
+          questionCount,
+          true,
+          "mcq",
+        )
+        apiQuestions = quizResponse.items
+      } else {
+        console.log("[v0] Fetching questions from database...")
+        apiQuestions = await getQuestionsFromDB(
+          quizConfig.topic,
+          quizConfig.difficulty,
+          questionCount,
+        )
       }
-    } else {
-      console.warn("[v0] [TIMING] No user logged in, skipping quiz timing")
-    }
 
-    setScreen("quiz")
-  } catch (err) {
-    console.error("[v0] Error fetching questions:", err)
-    const errorMessage = err instanceof Error ? err.message : "Failed to load questions"
-    setError(
-      `${errorMessage}\n\nTroubleshooting:\n• Backend'inizin çalıştığından emin olun\n• CORS ayarlarını kontrol edin`,
-    )
-  } finally {
-    setIsLoading(false)
-    setAbortController(null)
+      setQuestions(apiQuestions.map(convertAPIQuestionToLocal))
+
+      if (user) {
+        try {
+          console.log("[v0] [TIMING] Calling startQuizTiming API...")
+
+          const payload = {
+            topic: quizConfig.topic,
+            difficulty: quizConfig.difficulty,
+            total_questions: questionCount,
+            start_time: new Date().toISOString(),
+            mode: quizConfig.mode,
+          }
+
+          console.log("[v0] [TIMING] payload:", payload)
+
+          const quizStart = await startQuizTiming(user.access_token, payload)
+          setQuizAttemptId(quizStart.attempt_id)
+          timer.startQuiz()
+          console.log("[v0] [TIMING] timer.startQuiz() called successfully")
+        } catch (error) {
+          console.error("[v0] [TIMING] Failed to start quiz timing:", error)
+        }
+      } else {
+        console.warn("[v0] [TIMING] No user logged in, skipping quiz timing")
+      }
+
+      setScreen("quiz")
+    } catch (err) {
+      console.error("[v0] Error fetching questions:", err)
+      const errorMessage = err instanceof Error ? err.message : "Failed to load questions"
+      setError(
+        `${errorMessage}\n\nTroubleshooting:\n• Backend'inizin çalıştığından emin olun\n• CORS ayarlarını kontrol edin`,
+      )
+    } finally {
+      setIsLoading(false)
+      setAbortController(null)
+    }
   }
-}
 
   const handleCancel = () => {
     if (abortController) {
@@ -183,195 +205,362 @@ export default function QuizWidget() {
     setError("Soru üretimi iptal edildi.")
   }
 
-  /* ---------------------- API -> UI Question dönüştürücü ---------------------- */
-  type RawQ = any
-  const safeLower = (v: unknown) => (typeof v === "string" ? v.toLowerCase() : "")
+/* ---------------------- API -> UI Question dönüştürücü ---------------------- */
+type RawQ = any
+const safeLower = (v: unknown) => (typeof v === "string" ? v.toLowerCase() : "")
 
-  const convertAPIQuestionToLocal = (apiQuestion: RawQ): Question => {
-    const rawType = apiQuestion?.type ?? apiQuestion?.qtype ?? "mcq"
-    const typeStr = safeLower(String(rawType).replace(/[-_\s]/g, ""))
+const convertAPIQuestionToLocal = (apiQuestion: RawQ): Question => {
+  const rawType =
+    apiQuestion?.question_type ??
+    apiQuestion?.qtype ??
+    apiQuestion?.type ??
+    apiQuestion?.meta?.qtype ??
+    "mcq"
 
-    let questionType: QuestionType = "mcq"
-    if (["short", "kisa", "kısacevap", "kisacevap", "shortanswer"].includes(typeStr)) questionType = "short_answer"
-    else if (["senaryo", "scenario"].includes(typeStr)) questionType = "scenario"
-    else if (["open", "openended", "acikuclu", "açıkuçlu", "acik", "açık"].includes(typeStr)) questionType = "open_ended"
-    else if (["truefalse", "dogruyanlıs", "dogruyanlis", "true_false"].includes(typeStr)) questionType = "true_false"
+  const typeStr = safeLower(String(rawType).replace(/[-_\s]/g, ""))
 
-    const stem: string = (apiQuestion?.stem ?? apiQuestion?.question ?? "") as string
+  let questionType: QuestionType = "mcq"
 
-    const options: string[] = Array.isArray(apiQuestion?.choices)
-      ? apiQuestion.choices
-      : Array.isArray(apiQuestion?.options)
-      ? apiQuestion.options
-      : []
+  if (["short", "kisa", "kısacevap", "kisacevap", "shortanswer"].includes(typeStr)) {
+    questionType = "short_answer"
+  } else if (["senaryo", "scenario"].includes(typeStr)) {
+    questionType = "scenario"
+  } else if (["open", "openended", "acikuclu", "açıkuçlu", "acik", "açık"].includes(typeStr)) {
+    questionType = "open_ended"
+  } else if (["truefalse", "dogruyanlıs", "dogruyanlis", "true_false", "tf"].includes(typeStr)) {
+    questionType = "true_false"
+  }
 
-    // cevabı türet
-    let correctAnswer: string | string[] = ""
-    if (typeof apiQuestion?.answer === "string") {
-      correctAnswer = apiQuestion.answer
-    } else if (Number.isInteger(apiQuestion?.answer_index) && Array.isArray(options)) {
-      const idx = Number(apiQuestion.answer_index)
-      correctAnswer = idx >= 0 && idx < options.length ? options[idx] : ""
-    } else if (questionType === "true_false" && typeof apiQuestion?.answer === "boolean") {
-      correctAnswer = String(apiQuestion.answer)
-    } else if (typeof apiQuestion?.expected === "string") {
-      correctAnswer = apiQuestion.expected
-    }
-
-    return {
-      id: String(apiQuestion?.id ?? Math.random()),
-      type: questionType,
-      stem,
-      options,
-      correctAnswer,            // Question tipinde string | string[]
-      // rationale/source opsiyonel; istersen ekleyebilirsin:
-      // rationale: apiQuestion?.rationale ?? "",
-      // source: typeof apiQuestion?.source === "string" ? apiQuestion.source : undefined,
+  // ❗ Boş scenario -> open_ended'e çevir
+  let steps = apiQuestion?.steps
+  if (questionType === "scenario") {
+    if (!Array.isArray(steps) || steps.length === 0) {
+      questionType = "open_ended"
+      steps = []
     }
   }
 
-  const handleAnswerSubmit = (questionId: string, answer: string | string[]) => {
-    setUserAnswers((prev) => ({ ...prev, [questionId]: answer }))
-    setShowFeedback(true)
-    setScreen("feedback")
+  const stem: string = apiQuestion?.stem ?? apiQuestion?.question ?? ""
+
+  const options: string[] = Array.isArray(apiQuestion?.choices)
+    ? apiQuestion.choices
+    : Array.isArray(apiQuestion?.options)
+    ? apiQuestion.options
+    : []
+
+  // ---------- CEVAP NORMALİZASYONU ----------
+  let correctAnswer: string | string[] = ""
+
+  // 1) Direkt string answer
+  if (typeof apiQuestion?.answer === "string" && apiQuestion.answer.trim() !== "") {
+    correctAnswer = apiQuestion.answer
   }
 
-        const handleNext = async () => {
-    // 1) Önce mevcut sorunun timing'ini kapat
-    if (currentQuestionTimingId && user) {
-      try {
-        await endQuestionTiming(user.access_token, {
-          timing_id: currentQuestionTimingId,
-          client_end_time: new Date().toISOString(),
-        })
-        timer.endQuestion()
-      } catch (error) {
-        console.error("[v0] Failed to end question timing:", error)
-      }
+  // 2) answer_index (number veya string)
+  if ((!correctAnswer || correctAnswer === "") && options.length > 0) {
+    let idx: number | null = null
+
+    const rawIdx = apiQuestion?.answer_index
+    if (typeof rawIdx === "number") {
+      idx = rawIdx
+    } else if (typeof rawIdx === "string" && rawIdx.trim() !== "") {
+      const parsed = parseInt(rawIdx, 10)
+      if (!Number.isNaN(parsed)) idx = parsed
     }
 
-    const totalQuestions = config?.mode === "daily" ? 1 : config?.mode === "quick" ? 5 : 3
+    // 3) correct_option_indexes / correct_option_index desteği
+    const rawCorrectIdx =
+      apiQuestion?.correct_option_indexes ?? apiQuestion?.correct_option_index
 
-    // 2) Son soru değilse bir sonrakine geç
-    if (currentQuestionIndex < totalQuestions - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1)
-      setShowFeedback(false)
-      setScreen("quiz")
-      return
+    if (idx === null && Array.isArray(rawCorrectIdx) && rawCorrectIdx.length > 0) {
+      const parsed = Number(rawCorrectIdx[0])
+      if (!Number.isNaN(parsed)) idx = parsed
+    } else if (
+      idx === null &&
+      (typeof rawCorrectIdx === "number" || typeof rawCorrectIdx === "string")
+    ) {
+      const parsed = Number(rawCorrectIdx)
+      if (!Number.isNaN(parsed)) idx = parsed
     }
 
-    // 3) Buraya geldiysek quiz bitti
-    timer.endQuiz()
-
-    if (config?.mode === "daily") {
-      localStorage.setItem("lastDailyQuizCompletion", new Date().toISOString())
+    if (idx !== null && idx >= 0 && idx < options.length) {
+      correctAnswer = options[idx]
     }
+  }
 
-    if (user && config) {
-      let correctCount = 0
+  // 4) true/false boolean answer
+  if ((!correctAnswer || correctAnswer === "") && questionType === "true_false") {
+    if (typeof apiQuestion?.answer === "boolean") {
+      correctAnswer = String(apiQuestion.answer) // "true" / "false"
+    }
+  }
 
-      const detailedQuestions: {
-        question_id: string
-        stem: string
-        user_answer: string | string[]
-        correct_answer: string | string[]
-        is_correct: boolean
-      }[] = []
+  // 5) short/open ended -> expected
+  if (
+    (!correctAnswer || correctAnswer === "") &&
+    typeof apiQuestion?.expected === "string" &&
+    apiQuestion.expected.trim() !== ""
+  ) {
+    correctAnswer = apiQuestion.expected
+  }
 
-      for (const q of questions) {
-        const userAnswer = userAnswers[q.id]
+  // 🔍 Debug log – İlk birkaç denemede açık bırak, sonra istersen sil
+  console.log("[DEBUG] convertAPIQuestionToLocal", {
+    id: apiQuestion?.id,
+    type: questionType,
+    stem,
+    options,
+    answer_raw: apiQuestion?.answer,
+    answer_index: apiQuestion?.answer_index,
+    correct_option_indexes: apiQuestion?.correct_option_indexes,
+    correct_option_index: apiQuestion?.correct_option_index,
+    correctAnswer,
+  })
 
-        if (!userAnswer) {
-          detailedQuestions.push({
-            question_id: String(q.id),
-            stem: q.stem,
-            user_answer: "",
-            correct_answer: (q.correctAnswer ?? "") as string | string[],
-            is_correct: false,
-          })
-          continue
-        }
+  return {
+    rationale: apiQuestion?.rationale ?? "",
+    id: String(apiQuestion?.id ?? Math.random()),
+    type: questionType,
+    stem,
+    options,
+    // hem answer hem correctAnswer dolu olsun:
+    answer:
+      typeof correctAnswer === "string"
+        ? correctAnswer
+        : correctAnswer.length > 0
+        ? correctAnswer[0]
+        : undefined,
+    correctAnswer,
+    topic: apiQuestion?.topic ?? null,
+    level: apiQuestion?.level ?? null,
+    steps: steps ?? [],
+    meta: apiQuestion?.meta ?? {},
+    // 🔹 yeni eklendi
+    source: apiQuestion?.source ?? null,
+  }
 
-        let isCorrect = false
+}
 
-        if (q.type === "mcq" || q.type === "true_false") {
-          isCorrect = String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()
-        } else if (q.type === "short_answer") {
-          const norm = (s: string) => s.toLowerCase().trim().replace(/[.,!?;:]/g, "")
-          isCorrect = norm(String(userAnswer)) === norm(String(q.correctAnswer))
-        } else {
-          try {
-            const evaluation = await evaluateAnswer(
-              user.access_token,
-              q.stem,
-              String(q.correctAnswer),
-              String(userAnswer),
-            )
-            isCorrect = evaluation.is_correct
-          } catch {
-            const userWords = String(userAnswer).toLowerCase().split(/\s+/)
-            const expectedWords = String(q.correctAnswer).toLowerCase().split(/\s+/)
-            const matchCount = userWords.filter((w) => expectedWords.includes(w)).length
-            const similarity = matchCount / Math.max(userWords.length, expectedWords.length)
-            isCorrect = similarity > 0.4
-          }
-        }
 
-        if (isCorrect) correctCount++
+  const handleAnswerSubmit = async (
+  questionId: string | number,
+  answer: string | string[],
+) => {
+  const key = String(questionId)
+  setUserAnswers((prev) => ({ ...prev, [key]: answer }))
 
+  const q = questions[currentQuestionIndex]
+  let evalResult: EvaluateAnswerResponse | null = null
+
+  // Sadece open_ended + scenario için LLM değerlendirmesi
+  if (
+    user &&
+    q &&
+    (q.type === "open_ended" || q.type === "scenario")
+  ) {
+    try {
+      const rawCorrect =
+        typeof (q as any).correctAnswer === "string"
+          ? (q as any).correctAnswer
+          : Array.isArray((q as any).correctAnswer)
+          ? (q as any).correctAnswer.join(" ")
+          : typeof (q as any).answer === "string"
+          ? (q as any).answer
+          : ""
+
+      const userText = Array.isArray(answer)
+        ? answer
+            .map((ans, idx) => `Step ${idx + 1}: ${ans}`)
+            .join("\n")
+        : String(answer)
+
+      const result = await evaluateAnswer(
+        user.access_token,
+        q.stem,
+        rawCorrect,
+        userText,
+      )
+
+      evalResult = result
+      setEvalResults((prev) => ({ ...prev, [key]: result }))
+    } catch (err) {
+      console.error(
+        "[v0] evaluateAnswer (per-question) failed:",
+        err,
+      )
+    }
+  }
+
+  setCurrentEvaluation(evalResult)
+  setShowFeedback(true)
+  setScreen("feedback")
+}
+
+
+  const handleNext = async () => {
+  // bir sonraki soruda eski evaluation görünmesin
+  setCurrentEvaluation(null)
+
+  // 1) Önce mevcut sorunun timing'ini kapat
+  if (currentQuestionTimingId && user) {
+    try {
+      await endQuestionTiming(user.access_token, {
+        timing_id: currentQuestionTimingId,
+        client_end_time: new Date().toISOString(),
+      })
+      timer.endQuestion()
+    } catch (error) {
+      console.error("[v0] Failed to end question timing:", error)
+    }
+  }
+
+  const totalQuestions =
+    config?.mode === "daily" ? 1 : config?.mode === "quick" ? 5 : 3
+
+  // 2) Son soru değilse bir sonrakine geç
+  if (currentQuestionIndex < totalQuestions - 1) {
+    setCurrentQuestionIndex((prev) => prev + 1)
+    setShowFeedback(false)
+    setScreen("quiz")
+    return
+  }
+
+  // 3) Buraya geldiysek quiz bitti
+  timer.endQuiz()
+
+  if (config?.mode === "daily") {
+    localStorage.setItem(
+      "lastDailyQuizCompletion",
+      new Date().toISOString(),
+    )
+  }
+
+  if (user && config) {
+    let correctCount = 0
+
+    const detailedQuestions: QuestionResultDetail[] = []
+
+    for (const q of questions) {
+      const key = String(q.id)
+      const userAnswer = userAnswers[key]
+      const evalForQ = evalResults[key]
+
+      const rawCorrect =
+        typeof (q as any).correctAnswer === "string"
+          ? (q as any).correctAnswer
+          : Array.isArray((q as any).correctAnswer)
+          ? (q as any).correctAnswer.join(" ")
+          : typeof (q as any).answer === "string"
+          ? (q as any).answer
+          : ""
+
+      if (!userAnswer) {
         detailedQuestions.push({
-          question_id: String(q.id),
+          question_id: key,
           stem: q.stem,
-          user_answer: userAnswer as string | string[],
-          correct_answer: (q.correctAnswer ?? "") as string | string[],
-          is_correct: isCorrect,
+          user_answer: "",
+          correct_answer: (q as any).correctAnswer ?? rawCorrect,
+          is_correct: false,
         })
+        continue
       }
 
-      const totalQuestionsInResult = questions.length
-      const numericScore = totalQuestionsInResult > 0 ? (correctCount / totalQuestionsInResult) * 100 : 0
-      const score = Math.round(numericScore)
+      let isCorrect = false
 
-      // 🔥 Artık tüm finalize işlemi attempt/end üzerinden
-      if (quizAttemptId) {
-        try {
-          await endQuizTiming(user.access_token, {
-            attempt_id: quizAttemptId,
-            correct_answers: correctCount,
-            score,
-            client_end_time: new Date().toISOString(),
-            total_duration_ms: timer.totalQuizTime,
-            questions_attempted: JSON.stringify(detailedQuestions),
-          })
-        } catch (error) {
-          console.error("[v0] Failed to finalize quiz attempt:", error)
+      if (q.type === "mcq" || q.type === "true_false") {
+        isCorrect =
+          String(userAnswer).toLowerCase().trim() ===
+          String(rawCorrect).toLowerCase().trim()
+      } else if (q.type === "short_answer") {
+        const norm = (s: string) =>
+          s.toLowerCase().trim().replace(/[.,!?;:]/g, "")
+        isCorrect = norm(String(userAnswer)) === norm(String(rawCorrect))
+      } else {
+        // 🔥 open_ended + scenario → LLM sonucu varsa onu kullan
+        if (evalForQ) {
+          isCorrect = evalForQ.is_correct
+        } else {
+          // fallback: basit kelime benzerliği
+          const userWords = String(userAnswer)
+            .toLowerCase()
+            .split(/\s+/)
+          const expectedWords = String(rawCorrect)
+            .toLowerCase()
+            .split(/\s+/)
+          const matchCount = userWords.filter((w) =>
+            expectedWords.includes(w),
+          ).length
+          const similarity =
+            matchCount /
+            Math.max(userWords.length, expectedWords.length || 1)
+          isCorrect = similarity > 0.4
         }
       }
 
-      // Stats endpoint'i quiz_attempts üzerinden çalıştığı için sadece yeniden çekmemiz yeterli
+      if (isCorrect) correctCount++
+
+      detailedQuestions.push({
+        question_id: key,
+        stem: q.stem,
+        user_answer: userAnswer,
+        correct_answer: (q as any).correctAnswer ?? rawCorrect,
+        is_correct: isCorrect,
+        eval_score: evalForQ?.score,
+        eval_feedback: evalForQ?.feedback,
+      })
+    }
+
+    setDetailedResults(detailedQuestions)
+
+    const totalQuestionsInResult = questions.length
+    const numericScore =
+      totalQuestionsInResult > 0
+        ? (correctCount / totalQuestionsInResult) * 100
+        : 0
+    const score = Math.round(numericScore)
+
+    if (quizAttemptId) {
       try {
-        await loadUserStats(user.access_token)
+        await endQuizTiming(user.access_token, {
+          attempt_id: quizAttemptId,
+          correct_answers: correctCount,
+          score,
+          client_end_time: new Date().toISOString(),
+          total_duration_ms: timer.totalQuizTime,
+          questions_attempted: JSON.stringify(detailedQuestions),
+        })
       } catch (error) {
-        console.error("[v0] Failed to reload user stats:", error)
+        console.error("[v0] Failed to finalize quiz attempt:", error)
       }
     }
 
-    setScreen("results")
+    try {
+      await loadUserStats(user.access_token)
+    } catch (error) {
+      console.error("[v0] Failed to reload user stats:", error)
+    }
   }
+
+  setScreen("results")
+}
 
 
   const handleRestart = () => {
-    setScreen("home")
-    setConfig(null)
-    setCurrentQuestionIndex(0)
-    setUserAnswers({})
-    setShowFeedback(false)
-    setQuestions([])
-    setError(null)
-    setQuizAttemptId(null)
-    setCurrentQuestionTimingId(null)
-    timer.reset()
-  }
+  setScreen("home")
+  setConfig(null)
+  setCurrentQuestionIndex(0)
+  setUserAnswers({})
+  setShowFeedback(false)
+  setQuestions([])
+  setError(null)
+  setQuizAttemptId(null)
+  setCurrentQuestionTimingId(null)
+  setCurrentEvaluation(null)
+  setEvalResults({})
+  setDetailedResults(null)
+  timer.reset()
+}
+
 
   const handleLogin = async (username: string, password: string) => {
     const response = await login(username, password)
@@ -411,14 +600,13 @@ export default function QuizWidget() {
   useEffect(() => {
     if (screen === "quiz" && currentQuestion && quizAttemptId && user) {
       const startTiming = async () => {
-        try { 
-            const questionStart = await startQuestionTiming(user.access_token, {
-          attempt_id: quizAttemptId,
-          question_id: String(currentQuestion.id),
-          // istersen client_start_time: new Date().toISOString()
-        })
+        try {
+          const questionStart = await startQuestionTiming(user.access_token, {
+            attempt_id: quizAttemptId,
+            question_id: String(currentQuestion.id),
+          })
           setCurrentQuestionTimingId(questionStart.timing_id)
-          timer.startQuestion(currentQuestion.id)
+          timer.startQuestion(String(currentQuestion.id))
         } catch (error) {
           console.error("[v0] [TIMING] Failed to start question timing:", error)
         }
@@ -438,7 +626,10 @@ export default function QuizWidget() {
             <h1 className="text-2xl font-bold text-foreground">QuizBot</h1>
             {timer.isQuizActive && (
               <div className="flex items-center gap-2">
-                <Badge variant={timer.isPaused ? "secondary" : "default"} className="flex items-center gap-1.5">
+                <Badge
+                  variant={timer.isPaused ? "secondary" : "default"}
+                  className="flex items-center gap-1.5"
+                >
                   <Clock className="w-3.5 h-3.5" />
                   {timer.formatTime(timer.totalQuizTime)}
                 </Badge>
@@ -464,30 +655,54 @@ export default function QuizWidget() {
           </div>
         </div>
 
-        {screen === "auth" && <AuthScreen onLogin={handleLogin} onRegister={handleRegister} />}
-
-        {screen === "stats" && userStats && <StatsScreen stats={userStats} onBack={() => setScreen("home")} />}
-
-        {screen === "admin" && user && <AdminPanel token={user.access_token} onBack={() => setScreen("home")} />}
-
-        {screen === "chat" && user && (
-          <ChatScreen token={user.access_token} context={config?.topic} onBack={() => setScreen("home")} />
+        {screen === "auth" && (
+          <AuthScreen onLogin={handleLogin} onRegister={handleRegister} />
         )}
 
-        {screen === "home" && <HomeScreen onStartQuiz={handleStartQuiz} onChatMode={() => setScreen("chat")} />}
+        {screen === "stats" && userStats && user && (
+          <StatsScreen
+            stats={userStats}
+            token={user.access_token}
+            onBack={() => setScreen("home")}
+          />
+        )}
+
+        {screen === "admin" && user && (
+          <AdminPanel token={user.access_token} onBack={() => setScreen("home")} />
+        )}
+
+        {screen === "chat" && user && (
+          <ChatScreen
+            token={user.access_token}
+            context={config?.topic}
+            onBack={() => setScreen("home")}
+          />
+        )}
+
+        {screen === "home" && (
+          <HomeScreen onStartQuiz={handleStartQuiz} onChatMode={() => setScreen("chat")} />
+        )}
 
         {isLoading && (
           <Card className="p-12 flex flex-col items-center justify-center space-y-4">
             <div className="relative">
               <Loader2 className="w-12 h-12 animate-spin text-primary" />
-              {config?.useOllama && <Sparkles className="w-5 h-5 text-primary absolute -top-1 -right-1 animate-pulse" />}
+              {config?.useOllama && (
+                <Sparkles className="w-5 h-5 text-primary absolute -top-1 -right-1 animate-pulse" />
+              )}
             </div>
             <div className="text-center space-y-4">
               <p className="text-lg font-medium text-foreground">
                 {config?.useOllama ? "Sorular üretiliyor..." : "Quiz yükleniyor..."}
               </p>
-              {config?.useOllama && <p className="text-sm text-muted-foreground">İşlem tamamlanana kadar lütfen bekleyin</p>}
-              <Button onClick={handleCancel} variant="outline" size="sm">İptal Et</Button>
+              {config?.useOllama && (
+                <p className="text-sm text-muted-foreground">
+                  İşlem tamamlanana kadar lütfen bekleyin
+                </p>
+              )}
+              <Button onClick={handleCancel} variant="outline" size="sm">
+                İptal Et
+              </Button>
             </div>
           </Card>
         )}
@@ -497,13 +712,21 @@ export default function QuizWidget() {
             <div className="flex items-start gap-3">
               <AlertCircle className="w-6 h-6 text-destructive flex-shrink-0 mt-0.5" />
               <div className="space-y-2 flex-1">
-                <h3 className="text-xl font-semibold text-destructive">Backend Connection Error</h3>
+                <h3 className="text-xl font-semibold text-destructive">
+                  Backend Connection Error
+                </h3>
                 <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono bg-muted p-4 rounded-lg">
                   {error}
                 </pre>
               </div>
             </div>
-            <Button onClick={handleRestart} variant="outline" className="w-full bg-transparent">Return to Home</Button>
+            <Button
+              onClick={handleRestart}
+              variant="outline"
+              className="w-full bg-transparent"
+            >
+              Return to Home
+            </Button>
           </Card>
         )}
 
@@ -518,17 +741,26 @@ export default function QuizWidget() {
           />
         )}
 
-        {screen === "feedback" && questions[currentQuestionIndex] && (
+        {screen === "feedback" && currentQuestion && (
           <FeedbackScreen
-            question={questions[currentQuestionIndex]}
-            userAnswer={userAnswers[questions[currentQuestionIndex].id]}
+            question={currentQuestion}
+            userAnswer={userAnswers[String(currentQuestion.id)]}
             onNext={handleNext}
-            isLastQuestion={currentQuestionIndex === (config?.mode === "daily" ? 0 : config?.mode === "quick" ? 4 : 2)}
+            isLastQuestion={
+              currentQuestionIndex ===
+              (config?.mode === "daily" ? 0 : config?.mode === "quick" ? 4 : 2)
+            }
+            evaluation={currentEvaluation ?? undefined}
           />
         )}
 
-        {screen === "results" && (
-          <ResultsScreen questions={questions} userAnswers={userAnswers} onRestart={handleRestart} />
+          {screen === "results" && (
+          <ResultsScreen
+            questions={questions}
+            userAnswers={userAnswers}
+            detailedResults={detailedResults}
+            onRestart={handleRestart}
+          />
         )}
       </div>
     </div>

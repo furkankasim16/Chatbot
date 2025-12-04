@@ -26,4 +26,3 @@ def resolve_db_path(p: str | Path) -> Path:
     p = Path(p)
     return p if p.is_absolute() else (DB_DIR / p)
 DB_BACKUP = DB_BACKUP_DIR / "app_backup.db"
-

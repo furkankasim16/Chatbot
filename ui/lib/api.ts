@@ -1,7 +1,9 @@
 // API Service - Tüm backend çağrıları buradan yapılır
+import type { LlmStatsSummary } from "@/app/types/llm"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const API = `${API_BASE_URL}/api/v1`
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1"
 
 export interface Question {
   id?: string
@@ -29,7 +31,6 @@ export interface Question {
     chunk: number
     topic: string
   }
-  // 🔥 LLM bilgisi (backend’ten geliyorsa burada dursun)
   source_model?: string
   source_type?: string
 }
@@ -67,12 +68,8 @@ export interface UserStats {
   correct_answers: number
   last_quiz_date: string | null
   topic_stats: Record<string, TopicStatsEntry>
-
-  // ⏱️ Quiz bazlı süreler (ms)
   total_quiz_duration_ms: number
   avg_quiz_duration_ms: number
-
-  // ⏱️ Soru bazlı süreler
   total_questions_timed: number
   total_question_duration_ms: number
   avg_question_duration_ms: number
@@ -84,7 +81,6 @@ export interface QuizResult {
   total_questions: number
   correct_answers: number
   completed_at: string
-  // Yeni: soru bazlı detaylar (JSON string olarak)
   questions_attempted?: string
 }
 
@@ -107,9 +103,9 @@ export interface EvaluateAnswerRequest {
 }
 
 export interface EvaluateAnswerResponse {
-  score: number // 1-5 arası
-  is_correct: boolean // 4-5 puan ise true
-  feedback?: string // Opsiyonel geri bildirim
+  score: number
+  is_correct: boolean
+  feedback?: string
 }
 
 export interface ChatRequest {
@@ -169,6 +165,73 @@ export async function getAuditLogs(
   if (!res.ok) throw new Error("Loglar yüklenemedi")
 
   return res.json()
+}
+
+export interface QuestionResultDetail {
+  question_id: string
+  stem: string
+  user_answer: string | string[]
+  correct_answer: string | string[]
+  is_correct: boolean
+  eval_score?: number
+  eval_feedback?: string
+}
+
+export interface QuizAttemptHistoryQuestion {
+  question_id: string
+  stem: string
+  user_answer: string | string[] | null
+  correct_answer: string | string[] | null
+  is_correct: boolean
+  eval_score?: number | null
+  eval_feedback?: string | null
+}
+
+export interface QuizAttemptHistory {
+  id: number
+  user_id: number
+  username?: string | null
+  topic?: string | null
+  difficulty?: string | null
+  total_questions: number
+  correct_answers?: number | null
+  score?: number | null
+  quiz_date: string
+  start_time?: string | null
+  end_time?: string | null
+  total_duration_ms?: number | null
+  // admin detail endpoint için
+  questions?: QuizAttemptHistoryQuestion[]
+}
+
+
+export interface AdminQuizAttempt {
+  id: number
+  user_id: number
+  username?: string | null
+  topic?: string | null
+  difficulty?: string | null
+  total_questions: number
+  correct_answers?: number | null
+  score?: number | null
+  quiz_date: string
+  start_time?: string | null
+  end_time?: string | null
+  total_duration_ms?: number | null
+}
+
+export interface AdminQuestionAttempt {
+  question_id: string
+  stem: string
+  user_answer: any
+  correct_answer: any
+  is_correct: boolean
+  eval_score?: number | null
+  eval_feedback?: string | null
+}
+
+export interface AdminQuizAttemptDetail extends AdminQuizAttempt {
+  questions: AdminQuestionAttempt[]
 }
 
 const MOCK_QUESTIONS: Question[] = [
@@ -234,14 +297,12 @@ export async function checkHealth() {
   return res.json()
 }
 
-// Get available topics
 export async function getTopics() {
   const res = await fetch(`${API}/questions/topics`)
   if (!res.ok) throw new Error("Failed to fetch topics")
   return res.json() as Promise<{ topics: Record<string, number> }>
 }
 
-// Generate quiz for a topic
 export async function generateQuiz(
   topic: string,
   level = "beginner",
@@ -259,7 +320,6 @@ export async function generateQuiz(
   return res.json() as Promise<{ items: Question[]; shuffle: boolean }>
 }
 
-// Get random question (for Daily Question)
 export async function getRandomQuestion(topic?: string, level?: string) {
   const params = new URLSearchParams()
   if (topic) params.append("topic", topic)
@@ -272,7 +332,6 @@ export async function getRandomQuestion(topic?: string, level?: string) {
   return res.json() as Promise<Question>
 }
 
-// Generate a new question
 export async function generateQuestion(
   topic: string,
   level = "beginner",
@@ -288,21 +347,18 @@ export async function generateQuestion(
   return res.json()
 }
 
-// Get all questions (for debugging)
 export async function getAllQuestions() {
   const res = await fetch(`${API}/questions?limit=1000`)
   if (!res.ok) throw new Error("Failed to fetch questions")
   return res.json() as Promise<Question[]>
 }
 
-// Search in documents
 export async function searchDocuments(query: string) {
   const res = await fetch(`${API}/search?q=${encodeURIComponent(query)}`)
   if (!res.ok) throw new Error("Failed to search documents")
   return res.json()
 }
 
-// Get questions from DB
 export async function getQuestionsFromDB(
   topic: string,
   level: string,
@@ -321,12 +377,11 @@ export async function getQuestionsFromDB(
     const q = (await res.json()) as Question
     out.push(q)
     if (q.id) exclude.push(String(q.id))
-    if (i < count - 1) await new Promise((r) => setTimeout(r, 100)) // ritim
+    if (i < count - 1) await new Promise((r) => setTimeout(r, 100))
   }
   return out
 }
 
-// Login
 export async function login(
   username: string,
   password: string,
@@ -351,7 +406,6 @@ export async function login(
   return res.json()
 }
 
-// Register
 export async function register(
   username: string,
   email: string,
@@ -367,7 +421,6 @@ export async function register(
   return res.json()
 }
 
-// Get user stats
 export async function getUserStats(token: string): Promise<UserStats> {
   console.log("[v0] getUserStats called")
   console.log("[v0] API URL:", `${API}/auth/stats`)
@@ -391,7 +444,6 @@ export async function getUserStats(token: string): Promise<UserStats> {
   return stats
 }
 
-// Submit quiz result
 export async function submitQuizResult(
   token: string,
   result: QuizResult,
@@ -421,7 +473,6 @@ export async function submitQuizResult(
   console.log("[v0] submitQuizResult response data:", responseData)
 }
 
-// 🔹 Generate random question (Admin only) — ARTIK MODEL PARAMETRELİ
 export async function generateRandomQuestion(
   token: string,
   model: string,
@@ -444,7 +495,6 @@ export async function generateRandomQuestion(
   return res.json()
 }
 
-// 🔹 Generate question with parameters (Admin only) — ARTIK MODEL PARAMETRELİ
 export async function generateQuestionWithParams(
   token: string,
   topic: string,
@@ -491,7 +541,6 @@ async function authPost<T>(
   return (await res.json()) as T
 }
 
-// Delete question (Admin only)
 export async function deleteQuestion(
   token: string,
   questionId: string,
@@ -509,7 +558,6 @@ export async function deleteQuestion(
   }
 }
 
-// Create first admin user (No auth required, only works if no admin exists)
 export async function createFirstAdmin(
   username: string,
   email: string,
@@ -531,7 +579,6 @@ export async function createFirstAdmin(
   }
 }
 
-// Get all user activity (Admin only)
 export async function getUserActivity(
   token: string,
 ): Promise<QuizAttempt[]> {
@@ -542,7 +589,7 @@ export async function getUserActivity(
   return res.json()
 }
 
-// Evaluate answer for open-ended and scenario questions
+// 🔹 Evaluate answer for open-ended and scenario questions
 export async function evaluateAnswer(
   token: string,
   question: string,
@@ -554,7 +601,8 @@ export async function evaluateAnswer(
   console.log("[v0] Expected:", expected)
   console.log("[v0] User answer:", userAnswer)
 
-  const res = await fetch(`${API}/evaluate-answer`, {
+  // ✅ ARTIK DOĞRU PATH: /quiz/evaluate-answer
+  const res = await fetch(`${API}/quiz/evaluate-answer`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -571,16 +619,16 @@ export async function evaluateAnswer(
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => "Unknown error")
-    console.error("[v0] evaluateAnswer error response:", errorText)
+    console.error("[v0] evaluateAnswer not available:", res.status, errorText)
     throw new Error("Cevap değerlendirilemedi")
   }
 
-  const result = await res.json()
+  const result = (await res.json()) as EvaluateAnswerResponse
   console.log("[v0] evaluateAnswer response:", result)
   return result
 }
 
-// Send chat message
+
 export async function sendChatMessage(
   token: string,
   message: string,
@@ -599,7 +647,7 @@ export async function sendChatMessage(
   console.log("[v0] Request body:", JSON.stringify(requestBody))
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 120000) // 120 saniye timeout
+  const timeoutId = setTimeout(() => controller.abort(), 120000)
 
   try {
     const res = await fetch(`${API}/chat`, {
@@ -661,7 +709,6 @@ export interface EndQuizTimingPayload {
   score: number
   client_end_time?: string
   total_duration_ms?: number
-  // 🔥 Yeni
   questions_attempted?: string
 }
 
@@ -669,20 +716,18 @@ export async function endQuizTiming(
   token: string,
   body: EndQuizTimingPayload,
 ) {
-  const res = await fetch(
-    "http://localhost:8000/api/v1/quiz/attempt/end",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
+  const url = `${API_BASE_URL}/api/v1/quiz/attempt/end`
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-  )
+    body: JSON.stringify(body),
+  })
 
   if (!res.ok) {
-    const text = await res.text()
+    const text = await res.text().catch(() => "")
     console.error("[v0] endQuizTiming failed:", res.status, text)
     throw new Error(
       `Failed to finalize quiz attempt: ${res.status} ${text}`,
@@ -737,5 +782,131 @@ export async function finishQuizAttempt(
   token: string,
   body: FinishQuizAttemptPayload,
 ) {
-  return authPost("/quiz/attempt/end", token, body)
+  return authPost(
+    `${API_BASE_URL}/api/v1/quiz/attempt/end`,
+    token,
+    body,
+  )
+}
+
+export async function fetchLlmStatsSummary(): Promise<LlmStatsSummary[]> {
+  const res = await fetch(`${API_BASE}/admin/llm-stats/summary`, {
+    method: "GET",
+    next: { revalidate: 0 },
+  })
+
+  if (!res.ok) {
+    throw new Error("LLM stats fetch failed")
+  }
+
+  return res.json()
+}
+
+export async function getRecentAttempts(
+  token: string,
+  limit = 10,
+): Promise<QuizAttemptHistory[]> {
+  const res = await fetch(`${API_BASE}/quiz/attempts/recent?limit=${limit}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`getRecentAttempts failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+export async function adminGetQuizAttempts(
+  token: string,
+  params?: { user_id?: number; topic?: string; limit?: number; offset?: number },
+): Promise<QuizAttemptHistory[]> {
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1/admin/quiz/attempts`,
+  )
+
+  if (params?.user_id != null) url.searchParams.set("user_id", String(params.user_id))
+  if (params?.topic) url.searchParams.set("topic", params.topic)
+  if (params?.limit != null) url.searchParams.set("limit", String(params.limit))
+  if (params?.offset != null) url.searchParams.set("offset", String(params.offset))
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`adminGetQuizAttempts failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+// 🔹 Tek attempt + soru detayları
+export async function adminGetQuizAttemptDetail(
+  token: string,
+  attemptId: number,
+): Promise<QuizAttemptHistory> {
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+  const res = await fetch(
+    `${base}/api/v1/admin/quiz/attempts/${attemptId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  )
+
+  if (!res.ok) {
+    throw new Error(`adminGetQuizAttemptDetail failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+export async function getAdminQuizAttempts(
+  token: string,
+  params?: { user_id?: number; topic?: string; limit?: number; offset?: number },
+): Promise<AdminQuizAttempt[]> {
+  const url = new URL("http://localhost:8000/api/v1/admin/quiz/attempts")
+  if (params?.user_id != null) url.searchParams.set("user_id", String(params.user_id))
+  if (params?.topic) url.searchParams.set("topic", params.topic)
+  if (params?.limit != null) url.searchParams.set("limit", String(params.limit))
+  if (params?.offset != null) url.searchParams.set("offset", String(params.offset))
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`getAdminQuizAttempts failed with status ${res.status}`)
+  }
+
+  return res.json()
+}
+
+export async function getAdminQuizAttemptDetail(
+  token: string,
+  attemptId: number,
+): Promise<AdminQuizAttemptDetail> {
+  const res = await fetch(
+    `http://localhost:8000/api/v1/admin/quiz/attempts/${attemptId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  )
+
+  if (!res.ok) {
+    throw new Error(
+      `getAdminQuizAttemptDetail failed with status ${res.status}`,
+    )
+  }
+
+  return res.json()
 }

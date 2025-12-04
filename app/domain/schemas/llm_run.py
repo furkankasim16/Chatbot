@@ -1,3 +1,4 @@
+
 # app/domain/schemas/llm_run.py
 
 from pydantic import BaseModel
@@ -12,3 +13,12 @@ class LLMRun(BaseModel):
     token_input: Optional[int] = None
     token_output: Optional[int] = None
     created_at: Optional[str] = None
+
+class LLMStatsSummary(BaseModel):
+    model_name: str
+    total_calls: int
+    avg_latency_ms: Optional[float]
+    min_latency_ms: Optional[int]
+    max_latency_ms: Optional[int]
+    avg_input_tokens: Optional[float]
+    avg_output_tokens: Optional[float]

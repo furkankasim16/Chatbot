@@ -14,6 +14,7 @@ from app.api.routers.chat import router as chat_router
 from app.api.routers.auth import router as auth_router
 from app.api.routers.quiz import router as quiz_router
 from app.api.routers.admin import router as admin_router
+from app.api.routers.admin_quiz import router as admin_quiz_router
 
 # main.py (middleware kısmı)
 app.add_middleware(
@@ -38,6 +39,7 @@ api_v1.include_router(chat_router, prefix="/chat", tags=["chat"])
 api_v1.include_router(auth_router)       # bu dosyalarda kendi prefix’i var
 api_v1.include_router(quiz_router, tags=["quiz"])
 api_v1.include_router(admin_router, tags=["admin"])
+api_v1.include_router(admin_quiz_router)
 app.include_router(api_v1)
 
 def _bump_once(db_path, init_fn, target_version: int = 1):
