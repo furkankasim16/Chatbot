@@ -188,6 +188,7 @@ class QuizAttemptHistoryOut(BaseModel):
     score: float
     start_time: Optional[str] = None
     end_time: Optional[str] = None
+    total_duration_ms: Optional[int] = None
     questions: Optional[List[QuestionResultDetail]] = None
 
 # --------------------------
@@ -774,6 +775,7 @@ def get_recent_attempts(
               score,
               start_time,
               end_time,
+              total_duration_ms,
               questions_attempted
             FROM quiz_attempts
             WHERE user_id = ?
@@ -796,6 +798,7 @@ def get_recent_attempts(
             score,
             start_time,
             end_time,
+            total_duration_ms, 
             questions_json,
         ) = row
 
@@ -827,6 +830,7 @@ def get_recent_attempts(
                 score=float(score or 0),
                 start_time=start_time,
                 end_time=end_time,
+                total_duration_ms=total_duration_ms, 
                 questions=questions,
             )
         )

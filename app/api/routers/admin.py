@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import  APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Response
 from pydantic import BaseModel
 
 from app.api.deps import (
@@ -277,3 +277,25 @@ def delete_question_endpoint(
 
     # 204 No Content
     return Response(status_code=204)
+
+def require_admin(current=Depends(get_current_user)):
+    if not getattr(current, "is_admin", False) and not current.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin required")
+    return current
+
+@router.post("/generate-from-pdf", response_model=QuestionModel)
+async def generate_from_pdf(
+    topic: str = Form(...),
+    level: str = Form("beginner"),
+    qtype: str = Form("mcq"),
+    model: Optional[str] = Form(None),
+    file: UploadFile = File(...),
+    _ = Depends(require_admin),
+):
+    # TODO: buraya kendi PDF → chunk → embedding → LLM prompt akışını koyacaksın
+    # 1) file.file ile PDF içeriğini oku
+    # 2) İlgili sayfalardan context çıkar
+    # 3) LLM'e "bu PDF içinden {topic}/{level} bir {qtype} soru üret" promptu gönder
+    # 4) Dönen sonucu QuestionModel formatına map et ve return et
+
+    raise HTTPException(status_code=501, detail="Henüz implemente edilmedi")

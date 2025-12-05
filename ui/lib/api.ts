@@ -87,14 +87,17 @@ export interface QuizResult {
 export interface QuizAttempt {
   id: number
   username: string
-  quiz_date: string | null
-  topic: string
-  difficulty: string
+  quiz_date: string
+  topic: string | null
+  difficulty: string | null
   total_questions: number
-  correct_answers: number
-  score: number
+  correct_answers: number | null
+  score: number | null
   questions_attempted?: string | any[]
-}
+  start_time?: string | null      // opsiyonel
+  end_time?: string | null        // opsiyonel
+  total_duration_ms?: number | null   // ⭐ BURAYI EKLE
+} 
 
 export interface EvaluateAnswerRequest {
   question: string
@@ -158,14 +161,39 @@ export async function getAuditLogs(
   token: string,
   limit = 200,
 ): Promise<AuditLog[]> {
-  const res = await fetch(`${API}/admin/audit-logs?limit=${limit}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const url = `${API}/admin/audit-logs?limit=${limit}`
+  console.log("[ADMIN] getAuditLogs ->", url)
 
-  if (!res.ok) throw new Error("Loglar yüklenemedi")
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000)
 
-  return res.json()
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+
+    console.log("[ADMIN] getAuditLogs status:", res.status)
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "")
+      console.error("[ADMIN] getAuditLogs error body:", text)
+      throw new Error(text || "Loglar yüklenemedi")
+    }
+
+    return res.json()
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      console.error("[ADMIN] getAuditLogs timeout (10s)")
+      throw new Error("Log isteği zaman aşımına uğradı")
+    }
+    console.error("[ADMIN] getAuditLogs exception:", err)
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
+
 
 export interface QuestionResultDetail {
   question_id: string
@@ -579,14 +607,40 @@ export async function createFirstAdmin(
   }
 }
 
-export async function getUserActivity(
-  token: string,
-): Promise<QuizAttempt[]> {
-  const res = await fetch(`${API}/admin/user-activity`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Kullanıcı aktivitesi yüklenemedi")
-  return res.json()
+export async function getUserActivity(token: string): Promise<QuizAttempt[]> {
+  const url = `${API}/admin/user-activity`
+  console.log("[ADMIN] getUserActivity ->", url)
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 sn
+
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+
+    console.log("[ADMIN] getUserActivity status:", res.status)
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "")
+      console.error("[ADMIN] getUserActivity error body:", text)
+      throw new Error(
+        text || `Kullanıcı aktivitesi yüklenemedi (status: ${res.status})`,
+      )
+    }
+
+    return res.json()
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      console.error("[ADMIN] getUserActivity timeout (10s)")
+      throw new Error("Kullanıcı aktivitesi isteği zaman aşımına uğradı")
+    }
+    console.error("[ADMIN] getUserActivity exception:", err)
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 // 🔹 Evaluate answer for open-ended and scenario questions
@@ -790,17 +844,42 @@ export async function finishQuizAttempt(
 }
 
 export async function fetchLlmStatsSummary(): Promise<LlmStatsSummary[]> {
-  const res = await fetch(`${API_BASE}/admin/llm-stats/summary`, {
-    method: "GET",
-    next: { revalidate: 0 },
-  })
+  const url = `${API_BASE}/admin/llm-stats/summary`
+  console.log("[LLM] fetchLlmStatsSummary ->", url)
 
-  if (!res.ok) {
-    throw new Error("LLM stats fetch failed")
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000)
+
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      next: { revalidate: 0 },
+      signal: controller.signal,
+    })
+
+    console.log("[LLM] fetchLlmStatsSummary status:", res.status)
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "")
+      console.error("[LLM] fetchLlmStatsSummary error body:", text)
+      throw new Error(
+        text || `LLM stats fetch failed (status: ${res.status})`,
+      )
+    }
+
+    return res.json()
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      console.error("[LLM] fetchLlmStatsSummary timeout (10s)")
+      throw new Error("LLM istatistik isteği zaman aşımına uğradı")
+    }
+    console.error("[LLM] fetchLlmStatsSummary exception:", err)
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
   }
-
-  return res.json()
 }
+
 
 export async function getRecentAttempts(
   token: string,
@@ -909,4 +988,42 @@ export async function getAdminQuizAttemptDetail(
   }
 
   return res.json()
+}
+
+// 🔹 PDF'ten soru üretme
+export async function generateQuestionFromPdf(
+  token: string,
+  file: File,
+  options: {
+    topic?: string
+    level?: string
+    qtype?: string
+    model?: string
+  },
+): Promise<Question> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  if (options.topic) formData.append("topic", options.topic)
+  if (options.level) formData.append("level", options.level)
+  if (options.qtype) formData.append("qtype", options.qtype)
+  if (options.model) formData.append("model", options.model)
+
+  const res = await fetch(`${API}/admin/generate-from-pdf`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // ❗ FormData kullanırken Content-Type elle set ETME
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "PDF'ten soru üretilemedi" }))
+    throw new Error(error.detail || "PDF'ten soru üretilemedi")
+  }
+
+  // backend ya direkt Question döndürür, ya da { question } wrapper'ı olabilir
+  const data = await res.json()
+  return (data as any).question ?? data
 }

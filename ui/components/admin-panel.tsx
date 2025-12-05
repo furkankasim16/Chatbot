@@ -20,19 +20,20 @@ import {
   ArrowLeft,
   Users,
   Brain,
-  ListChecks, // ⬅️ yeni ikon
+  ListChecks,
 } from "lucide-react"
 import {
   generateRandomQuestion,
   generateQuestionWithParams,
   deleteQuestion,
   type Question,
+  generateQuestionFromPdf,
 } from "@/lib/api"
 import { UserActivityTable } from "@/components/user-activity-table"
 import { AuditLogsTable } from "@/components/audit-logs-table"
 import { AdminLlmStats } from "@/components/admin-llm-stats"
 import { LlmPerformanceChart } from "@/components/admin-llm-stats-chart"
-import { AdminAttemptsPanel } from "./admin-attempts-panel"
+import { AdminQuestionBank } from "@/components/admin-question-bank"
 
 interface AdminPanelProps {
   token: string
@@ -41,7 +42,7 @@ interface AdminPanelProps {
 
 export function AdminPanel({ token, onBack }: AdminPanelProps) {
   const [currentView, setCurrentView] = useState<
-    "generate" | "activity" | "audit" | "llmStats" | "attempts"
+    "generate" | "activity" | "audit" | "llmStats" | "questionBank"
   >("generate")
 
   const [isGenerating, setIsGenerating] = useState(false)
@@ -55,8 +56,12 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
   const [topic, setTopic] = useState<string>("")
   const [difficulty, setDifficulty] = useState<string>("beginner")
 
-  // ⭐ LLM MODEL SEÇİMİ (backend ile uyumlu KEY'ler)
-  const [llmModel, setLlmModel] = useState<string>("ollama_local")
+  // ⭐ LLM MODEL SEÇİMİ
+  const [llmModel, setLlmModel] = useState<string>("ollama:llama3")
+
+  // ⭐ PDF'ten soru üretme durumları
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [isPdfGenerating, setIsPdfGenerating] = useState(false)
 
   const handleGenerateRandom = async () => {
     setIsGenerating(true)
@@ -64,7 +69,7 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
     setGeneratedQuestion(null)
 
     try {
-      const response = await generateRandomQuestion(token, llmModel) // ⭐ MODEL PARAM EKLENDİ
+      const response = await generateRandomQuestion(token, llmModel)
       const question = (response as any).question || response
 
       if (!question.stem?.trim()) setError("Soru üretildi ama içerik boş.")
@@ -92,7 +97,7 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
         topic,
         difficulty,
         questionType,
-        llmModel, // ⭐ MODEL EKLENDİ
+        llmModel,
       )
       const question = (response as any).question || response
 
@@ -103,6 +108,42 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
       setError(err instanceof Error ? err.message : "Soru üretilemedi")
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleGenerateFromPdf = async () => {
+    if (!pdfFile) {
+      setError("Lütfen bir PDF dosyası seçin")
+      return
+    }
+    if (!topic.trim()) {
+      setError("PDF için bir konu girin (örn: product_basics)")
+      return
+    }
+
+    setIsPdfGenerating(true)
+    setError(null)
+    setGeneratedQuestion(null)
+
+    try {
+      const question = await generateQuestionFromPdf(token, pdfFile, {
+        topic,
+        level: difficulty,
+        qtype: questionType,
+        model: llmModel,
+      })
+
+      if (!question.stem?.trim()) {
+        setError("Soru üretildi ancak içerik boş görünüyor.")
+      }
+
+      setGeneratedQuestion(question)
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "PDF'ten soru üretilemedi",
+      )
+    } finally {
+      setIsPdfGenerating(false)
     }
   }
 
@@ -166,21 +207,20 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
           </Button>
 
           <Button
-            variant={currentView === "attempts" ? "default" : "outline"}
-            onClick={() => setCurrentView("attempts")}
-          >
-            <ListChecks className="w-4 h-4 mr-2" />
-            Quiz Attempts
-          </Button>
-
-          {/* ⭐ Yeni: LLM Performans sekmesi */}
-          <Button
             variant={currentView === "llmStats" ? "default" : "outline"}
             onClick={() => setCurrentView("llmStats")}
           >
             <Brain className="w-4 h-4 mr-2" />
             LLM Performans
           </Button>
+          
+          <Button
+          variant={currentView === "questionBank" ? "default" : "outline"}
+          onClick={() => setCurrentView("questionBank")}
+        >
+          <ListChecks className="w-4 h-4 mr-2" />
+          Soru Bankası
+        </Button>
         </div>
       </div>
 
@@ -190,14 +230,13 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
       ) : currentView === "audit" ? (
         <AuditLogsTable token={token} />
       ) : currentView === "llmStats" ? (
-        // ⭐ LLM performans tablosu + grafik
         <div className="space-y-6">
           <AdminLlmStats />
           <LlmPerformanceChart />
         </div>
-      ) : currentView === "attempts" ? (
-        <AdminAttemptsPanel token={token} />
-      ) : (
+      ) : currentView === "questionBank" ? (
+          <AdminQuestionBank token={token} />
+        ) : (
         <>
           {error && (
             <Card className="p-4 border-destructive/50 bg-destructive/10">
@@ -317,6 +356,95 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
                     <Sparkles className="w-4 h-4 mr-2" />
                   )}
                   Soru Üret
+                </Button>
+              </div>
+            </Card>
+
+            {/* 📄 PDF'ten soru üretim */}
+            <Card className="p-6 space-y-4">
+              <h3 className="text-lg font-semibold">PDF'ten Soru Üret</h3>
+
+              <p className="text-sm text-muted-foreground">
+                Yüklediğiniz PDF içeriğine göre, seçtiğiniz konu / zorlukta otomatik soru üretir.
+              </p>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>PDF Dosyası</Label>
+                  <Input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null
+                      setPdfFile(file)
+                    }}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Örn: ders notları, ürün kataloğu, teknik doküman…
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>PDF Konu Etiketi</Label>
+                  <Input
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="Örn: product_basics"
+                  />
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Zorluk</Label>
+                    <Select value={difficulty} onValueChange={setDifficulty}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="beginner">Başlangıç</SelectItem>
+                        <SelectItem value="intermediate">Orta</SelectItem>
+                        <SelectItem value="advanced">İleri</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Soru Tipi</Label>
+                    <Select
+                      value={questionType}
+                      onValueChange={setQuestionType}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mcq">Çoktan Seçmeli</SelectItem>
+                        <SelectItem value="true_false">
+                          Doğru / Yanlış
+                        </SelectItem>
+                        <SelectItem value="short_answer">
+                          Kısa Cevap
+                        </SelectItem>
+                        <SelectItem value="open_ended">
+                          Açık Uçlu
+                        </SelectItem>
+                        <SelectItem value="scenario">Senaryo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleGenerateFromPdf}
+                  disabled={isPdfGenerating || !pdfFile}
+                  className="w-full"
+                >
+                  {isPdfGenerating ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  PDF'ten Soru Üret
                 </Button>
               </div>
             </Card>

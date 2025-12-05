@@ -9,14 +9,18 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Clock } from "lucide-react"
+import { Clock, Loader2 } from "lucide-react"
 import type { Question } from "@/app/types/quiz"
 
 interface QuizInterfaceProps {
   question: Question
   questionNumber: number
   totalQuestions: number
-  onSubmit: (questionId: string | number, answer: string | string[]) => void
+  // 🔥 async de destekle
+  onSubmit: (
+    questionId: string | number,
+    answer: string | string[],
+  ) => void | Promise<void>
   questionTime?: number
   formatTime?: (ms: number) => string
 
@@ -53,7 +57,8 @@ export function QuizInterface({
 
   const typeStr = String(rawType).toLowerCase().replace(/[-_\s]/g, "")
 
-  let qtype: "mcq" | "true_false" | "short_answer" | "open_ended" | "scenario" = "mcq"
+  let qtype: "mcq" | "true_false" | "short_answer" | "open_ended" | "scenario" =
+    "mcq"
 
   if (["truefalse", "dogruyanlıs", "dogruyanlis", "true_false", "tf"].includes(typeStr)) {
     qtype = "true_false"
@@ -68,10 +73,7 @@ export function QuizInterface({
   }
 
   const stem: string = raw.stem ?? raw.question ?? ""
-  const options: string[] =
-    raw.options ??
-    raw.choices ??
-    []
+  const options: string[] = raw.options ?? raw.choices ?? []
 
   const steps = raw.steps as any[] | undefined
 
@@ -85,35 +87,46 @@ export function QuizInterface({
   const [scenarioAnswers, setScenarioAnswers] = useState<Record<number, string>>({})
   const [currentStep, setCurrentStep] = useState(1)
 
+  // 🔥 yeni: submit sırasında kilitlemek için
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const progress = (questionNumber / totalQuestions) * 100
 
   // --- Gönderim ---
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (isSubmitting) return // ikinci tıklamayı engelle
+
     const qid = raw.id ?? ""
 
-    if (qtype === "scenario") {
-      const allAnswers = Object.values(scenarioAnswers)
-      onSubmit(qid, allAnswers)
-      return
-    }
+    setIsSubmitting(true)
+    try {
+      if (qtype === "scenario") {
+        const allAnswers = Object.values(scenarioAnswers)
+        await onSubmit(qid, allAnswers)
+        return
+      }
 
-    if (qtype === "mcq") {
-      if (effectiveSelected == null) return
-      const chosen = options[effectiveSelected]
-      onSubmit(qid, chosen)
-      return
-    }
+      if (qtype === "mcq") {
+        if (effectiveSelected == null) return
+        const chosen = options[effectiveSelected]
+        await onSubmit(qid, chosen)
+        return
+      }
 
-    // true_false, short_answer, open_ended
-    onSubmit(qid, textAnswer)
+      // true_false, short_answer, open_ended
+      await onSubmit(qid, textAnswer)
+    } finally {
+      // component ekrandan kalksa bile ekstra zararı yok
+      setIsSubmitting(false)
+    }
   }
 
-  const handleScenarioNext = () => {
+  const handleScenarioNext = async () => {
     if (steps && currentStep < steps.length) {
       setCurrentStep((prev) => prev + 1)
     } else {
-      // Son adım → submit
-      handleSubmit()
+      // Son adım → submit (LLM call burada)
+      await handleSubmit()
     }
   }
 
@@ -174,7 +187,9 @@ export function QuizInterface({
             {/* Multiple Choice */}
             {qtype === "mcq" && options.length > 0 && (
               <RadioGroup
-                value={effectiveSelected != null ? String(effectiveSelected) : ""}
+                value={
+                  effectiveSelected != null ? String(effectiveSelected) : ""
+                }
                 onValueChange={(val) => {
                   const idx = parseInt(val)
                   if (!isNaN(idx)) setEffectiveSelected(idx)
@@ -240,7 +255,8 @@ export function QuizInterface({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                  Scenario - Step {currentStep} of {Array.isArray(steps) && steps.length > 0 ? steps.length : 1}
+                  Scenario - Step {currentStep} of{" "}
+                  {Array.isArray(steps) && steps.length > 0 ? steps.length : 1}
                 </div>
 
                 <Badge variant="outline" className="flex items-center gap-1.5">
@@ -255,22 +271,24 @@ export function QuizInterface({
             </div>
 
             <div className="space-y-4">
-              {Array.isArray(steps) && steps.length > 0 && (() => {
-                const step = steps[currentStep - 1] || {}
-                const stepText = step.prompt ?? step.stem ?? ""
-                return (
-                  <div className="p-4 rounded-lg bg-muted/50 border">
-                    <p className="text-sm font-medium mb-2">
-                      Step {currentStep}
-                    </p>
-                    <p className="text-base whitespace-pre-line">
-                      {stepText}
-                    </p>
-                  </div>
-                )
-              })()}
+              {Array.isArray(steps) &&
+                steps.length > 0 &&
+                (() => {
+                  const step = steps[currentStep - 1] || {}
+                  const stepText = step.prompt ?? step.stem ?? ""
+                  return (
+                    <div className="p-4 rounded-lg bg-muted/50 border">
+                      <p className="text-sm font-medium mb-2">
+                        Step {currentStep}
+                      </p>
+                      <p className="text-base whitespace-pre-line">
+                        {stepText}
+                      </p>
+                    </div>
+                  )
+                })()}
 
-              {/* 🔥 steps olsun olmasın her zaman textarea gösteriyoruz */}
+              {/* steps olsun olmasın her zaman textarea gösteriyoruz */}
               <Textarea
                 value={scenarioAnswers[currentStep] || ""}
                 onChange={(e) =>
@@ -287,14 +305,25 @@ export function QuizInterface({
         )}
 
         <Button
-          onClick={qtype === "scenario" ? handleScenarioNext : handleSubmit}
-          disabled={!isAnswerValid()}
+          onClick={
+            qtype === "scenario" ? handleScenarioNext : handleSubmit
+          }
+          disabled={!isAnswerValid() || isSubmitting}
           className="w-full h-12"
           size="lg"
         >
-          {qtype === "scenario" && Array.isArray(steps) && currentStep < (steps?.length || 1)
-            ? "Next Step"
-            : "Submit Answer"}
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Cevap değerlendiriliyor...
+            </>
+          ) : qtype === "scenario" &&
+            Array.isArray(steps) &&
+            currentStep < (steps?.length || 1) ? (
+            "Next Step"
+          ) : (
+            "Submit Answer"
+          )}
         </Button>
       </Card>
     </div>

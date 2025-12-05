@@ -61,6 +61,9 @@ def user_activity(limit: int = 100) -> List[dict]:
               qa.total_questions,
               qa.correct_answers,
               qa.score,
+              qa.start_time,
+              qa.end_time,
+              qa.total_duration_ms,        -- ⭐ BURADA ARTIK VAR
               qa.questions_attempted
             FROM quiz_attempts qa
             JOIN users u ON u.id = qa.user_id
@@ -80,6 +83,9 @@ def user_activity(limit: int = 100) -> List[dict]:
             "total_questions": r["total_questions"],
             "correct_answers": r["correct_answers"],
             "score": r["score"],
+            "start_time": r["start_time"],              # opsiyonel ama faydalı
+            "end_time": r["end_time"],                  # opsiyonel
+            "total_duration_ms": r["total_duration_ms"],# ⭐ FRONTEND BURAYI KULLANACAK
             "questions_attempted": r["questions_attempted"],
         })
     return out
