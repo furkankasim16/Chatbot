@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     OLLAMA_URL: AnyHttpUrl = "http://localhost:11434"
     OLLAMA_MODEL : str = "llama3:instruct"
-    GEMINI_API_KEY: str ="AIzaSyAUjC7Fs2xAItHTUXTrg6_LCAiiwceKx6o"
+    GEMINI_API_KEY: str ="AIzaSyCs1NBKBimQyKQAzyStTseu9bAptUZkzz8"
     GROQ_API_KEY : str  = "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"
     EMBED_MODEL: str = "intfloat/multilingual-e5-large"
 

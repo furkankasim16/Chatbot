@@ -1,7 +1,7 @@
 # app/domain/schemas/question.py
 
 from enum import Enum
-from typing import List, Optional, Literal, Union
+from typing import Any, Dict, List, Optional, Literal, Union
 from pydantic import BaseModel, Field
 
 # --- enums ---
@@ -24,6 +24,50 @@ class ShortAnswerMatchingType(str, Enum):
     CONTAINS = "contains"
     REGEX = "regex"
 
+# --- update modelleri ---
+class ScenarioStepUpdate(BaseModel):
+    step_id: Optional[int] = None           # Varolan adım için id, yeni adımda None
+    order: Optional[int] = None             # Step sırası (1,2,3...)
+    step_type: str                          # "mcq" | "true_false" | ...
+    stem: str                               # Adım sorusu
+    prompt: Optional[str] = None            # İstersen kullanırsın
+    max_score: Optional[float] = None
+
+    options: Optional[List[str]] = None
+    correct_option_indexes: Optional[List[int]] = None
+    correct_answer_bool: Optional[bool] = None
+
+    accepted_answers: Optional[List[str]] = None
+    matching_type: Optional[str] = None
+    rubric: Optional[str] = None
+
+    # Frontend’ten geliyor; create / update / delete
+    _action: Optional[Literal["create", "update", "delete"]] = None
+
+class QuestionUpdate(BaseModel):
+    topic: Optional[str] = None
+    question_type: Optional[str] = None
+    difficulty: Optional[str] = None
+    stem: Optional[str] = None
+
+    # MCQ
+    options: Optional[List[str]] = None
+    correct_option_indexes: Optional[List[int]] = None
+
+    # True/False
+    correct_answer_bool: Optional[bool] = None
+
+    # Short Answer
+    accepted_answers: Optional[List[str]] = None
+    matching_type: Optional[str] = None
+
+    # Open Ended
+    rubric: Optional[str] = None
+
+    # SCENARIO
+    scenario: Optional[str] = None
+    steps: Optional[List[Dict[str, Any]]] = None 
+
 # --- base ---
 
 class BaseQuestion(BaseModel):
@@ -36,6 +80,7 @@ class BaseQuestion(BaseModel):
     stem: str
     explanation: Optional[str] = None
     max_score: float = 1.0
+    source_model: Optional[str] = None
 
 # --- tek adımlılar (mcq / tf / short / open) ---
 

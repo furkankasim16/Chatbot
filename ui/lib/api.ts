@@ -1,9 +1,49 @@
 // API Service - Tüm backend çağrıları buradan yapılır
 import type { LlmStatsSummary } from "@/app/types/llm"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-const API = `${API_BASE_URL}/api/v1`
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1"
+export type ChatRole = "user" | "assistant" | "system"
+
+export interface ChatMessage {
+  role: ChatRole
+  content: string
+}
+
+export interface ChatModeConfig {
+  id: string
+  title: string
+  description: string
+  provider: string
+  model: string
+  temperature: number
+  max_history: number
+}
+
+export interface ChatTurnRequest {
+  mode: string
+  topic?: string | null
+  level?: string | null
+  message: string
+  history?: ChatMessage[]
+  session_id?: string | null 
+}
+
+export interface ChatTurnResponse {
+  mode: string
+  topic?: string | null
+  level?: string | null
+  reply: string
+  suggestions?: string[] | null
+  raw_model?: string
+  usage?: any
+  error?: string | null
+  session_id?: string
+  actions?: { type: string; payload?: any }[] | null
+}
+
+// 🔹 Base URL’leri tek yerde topluyoruz
+const API_ROOT = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API = `${API_ROOT}/api/v1`
+const CHAT_API = `${API}/chat`
 
 export interface Question {
   id?: string
@@ -94,10 +134,10 @@ export interface QuizAttempt {
   correct_answers: number | null
   score: number | null
   questions_attempted?: string | any[]
-  start_time?: string | null      // opsiyonel
-  end_time?: string | null        // opsiyonel
-  total_duration_ms?: number | null   // ⭐ BURAYI EKLE
-} 
+  start_time?: string | null
+  end_time?: string | null
+  total_duration_ms?: number | null
+}
 
 export interface EvaluateAnswerRequest {
   question: string
@@ -194,7 +234,6 @@ export async function getAuditLogs(
   }
 }
 
-
 export interface QuestionResultDetail {
   question_id: string
   stem: string
@@ -228,10 +267,8 @@ export interface QuizAttemptHistory {
   start_time?: string | null
   end_time?: string | null
   total_duration_ms?: number | null
-  // admin detail endpoint için
   questions?: QuizAttemptHistoryQuestion[]
 }
-
 
 export interface AdminQuizAttempt {
   id: number
@@ -612,7 +649,7 @@ export async function getUserActivity(token: string): Promise<QuizAttempt[]> {
   console.log("[ADMIN] getUserActivity ->", url)
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 sn
+  const timeoutId = setTimeout(() => controller.abort(), 10000)
 
   try {
     const res = await fetch(url, {
@@ -655,7 +692,6 @@ export async function evaluateAnswer(
   console.log("[v0] Expected:", expected)
   console.log("[v0] User answer:", userAnswer)
 
-  // ✅ ARTIK DOĞRU PATH: /quiz/evaluate-answer
   const res = await fetch(`${API}/quiz/evaluate-answer`, {
     method: "POST",
     headers: {
@@ -681,7 +717,6 @@ export async function evaluateAnswer(
   console.log("[v0] evaluateAnswer response:", result)
   return result
 }
-
 
 export async function sendChatMessage(
   token: string,
@@ -750,7 +785,7 @@ export async function startQuizTiming(
   payload: StartQuizAttemptPayload,
 ): Promise<{ attempt_id: number }> {
   return authPost<{ attempt_id: number }>(
-    `${API_BASE_URL}/api/v1/quiz/attempt/start`,
+    `${API}/quiz/attempt/start`,
     token,
     payload,
   )
@@ -770,7 +805,7 @@ export async function endQuizTiming(
   token: string,
   body: EndQuizTimingPayload,
 ) {
-  const url = `${API_BASE_URL}/api/v1/quiz/attempt/end`
+  const url = `${API}/quiz/attempt/end`
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -807,7 +842,7 @@ export async function startQuestionTiming(
   payload: StartQuestionTimingPayload,
 ): Promise<{ timing_id: number }> {
   return authPost<{ timing_id: number }>(
-    `${API_BASE_URL}/api/v1/quiz/question/start`,
+    `${API}/quiz/question/start`,
     token,
     payload,
   )
@@ -818,7 +853,7 @@ export async function endQuestionTiming(
   payload: EndQuestionTimingPayload,
 ): Promise<{ success: boolean }> {
   return authPost<{ success: boolean }>(
-    `${API_BASE_URL}/api/v1/quiz/question/end`,
+    `${API}/quiz/question/end`,
     token,
     payload,
   )
@@ -837,14 +872,14 @@ export async function finishQuizAttempt(
   body: FinishQuizAttemptPayload,
 ) {
   return authPost(
-    `${API_BASE_URL}/api/v1/quiz/attempt/end`,
+    `${API}/quiz/attempt/end`,
     token,
     body,
   )
 }
 
 export async function fetchLlmStatsSummary(): Promise<LlmStatsSummary[]> {
-  const url = `${API_BASE}/admin/llm-stats/summary`
+  const url = `${API}/admin/llm-stats/summary`
   console.log("[LLM] fetchLlmStatsSummary ->", url)
 
   const controller = new AbortController()
@@ -880,12 +915,11 @@ export async function fetchLlmStatsSummary(): Promise<LlmStatsSummary[]> {
   }
 }
 
-
 export async function getRecentAttempts(
   token: string,
   limit = 10,
 ): Promise<QuizAttemptHistory[]> {
-  const res = await fetch(`${API_BASE}/quiz/attempts/recent?limit=${limit}`, {
+  const res = await fetch(`${API}/quiz/attempts/recent?limit=${limit}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -897,13 +931,12 @@ export async function getRecentAttempts(
 
   return res.json()
 }
+
 export async function adminGetQuizAttempts(
   token: string,
   params?: { user_id?: number; topic?: string; limit?: number; offset?: number },
 ): Promise<QuizAttemptHistory[]> {
-  const url = new URL(
-    `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1/admin/quiz/attempts`,
-  )
+  const url = new URL(`${API}/admin/quiz/attempts`)
 
   if (params?.user_id != null) url.searchParams.set("user_id", String(params.user_id))
   if (params?.topic) url.searchParams.set("topic", params.topic)
@@ -928,9 +961,8 @@ export async function adminGetQuizAttemptDetail(
   token: string,
   attemptId: number,
 ): Promise<QuizAttemptHistory> {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
   const res = await fetch(
-    `${base}/api/v1/admin/quiz/attempts/${attemptId}`,
+    `${API}/admin/quiz/attempts/${attemptId}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -949,7 +981,7 @@ export async function getAdminQuizAttempts(
   token: string,
   params?: { user_id?: number; topic?: string; limit?: number; offset?: number },
 ): Promise<AdminQuizAttempt[]> {
-  const url = new URL("http://localhost:8000/api/v1/admin/quiz/attempts")
+  const url = new URL(`${API}/admin/quiz/attempts`)
   if (params?.user_id != null) url.searchParams.set("user_id", String(params.user_id))
   if (params?.topic) url.searchParams.set("topic", params.topic)
   if (params?.limit != null) url.searchParams.set("limit", String(params.limit))
@@ -973,7 +1005,7 @@ export async function getAdminQuizAttemptDetail(
   attemptId: number,
 ): Promise<AdminQuizAttemptDetail> {
   const res = await fetch(
-    `http://localhost:8000/api/v1/admin/quiz/attempts/${attemptId}`,
+    `${API}/admin/quiz/attempts/${attemptId}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1013,7 +1045,6 @@ export async function generateQuestionFromPdf(
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      // ❗ FormData kullanırken Content-Type elle set ETME
     },
     body: formData,
   })
@@ -1023,7 +1054,69 @@ export async function generateQuestionFromPdf(
     throw new Error(error.detail || "PDF'ten soru üretilemedi")
   }
 
-  // backend ya direkt Question döndürür, ya da { question } wrapper'ı olabilir
   const data = await res.json()
   return (data as any).question ?? data
+}
+
+export interface UpdateQuestionPayload {
+  topic?: string
+  question_type?: string
+  difficulty?: string
+  stem?: string
+}
+
+export async function updateQuestion(
+  id: string | number,
+  data: {
+    topic?: string
+    question_type?: string
+    difficulty?: string
+    stem?: string
+    options?: string[]
+    correct_option_indexes?: number[]
+  },
+  token: string,
+) {
+  const res = await fetch(`${API}/questions/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  })
+
+  if (!res.ok) {
+    throw new Error("Question update failed")
+  }
+
+  return res.json()
+}
+
+// 🔹 Yeni Chat Mode API’leri
+export async function getChatModes(token: string): Promise<Record<string, ChatModeConfig>> {
+  const res = await fetch(`${CHAT_API}/modes`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Chat modes failed")
+  return res.json()
+}
+
+export async function sendChatTurn(
+  token: string,
+  payload: ChatTurnRequest,
+): Promise<ChatTurnResponse> {
+  const res = await fetch(`${CHAT_API}/turn`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "")
+    throw new Error(`sendChatTurn failed: ${res.status} ${txt}`)
+  }
+  return res.json()
 }

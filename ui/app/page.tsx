@@ -13,7 +13,12 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { ChatScreen } from "@/components/chat-screen"
 import { useQuizTimer } from "@/hooks/use-quiz-timer"
 import type { Question, QuestionType } from "@/app/types/quiz"
-import type { Question as APIQuestion, UserStats, LoginResponse, EvaluateAnswerResponse } from "@/lib/api"
+import type {
+  Question as APIQuestion,
+  UserStats,
+  LoginResponse,
+  EvaluateAnswerResponse,
+} from "@/lib/api"
 
 import {
   getQuestionsFromDB,
@@ -21,13 +26,11 @@ import {
   login,
   register,
   getUserStats,
-  submitQuizResult,
   evaluateAnswer,
   startQuizTiming,
   endQuizTiming,
   startQuestionTiming,
   endQuestionTiming,
-
 } from "@/lib/api"
 
 import { Loader2, AlertCircle, Sparkles, Clock } from "lucide-react"
@@ -37,7 +40,6 @@ import { Badge } from "@/components/ui/badge"
 
 export type QuizMode = "quick" | "daily" | "scenario"
 export type Difficulty = "beginner" | "intermediate" | "advanced" | "mixed"
-
 
 export interface QuizConfig {
   mode: QuizMode
@@ -49,6 +51,16 @@ export interface QuizConfig {
 interface ExtendedLoginResponse extends LoginResponse {
   is_admin: boolean
   user_id?: number
+}
+
+type QuestionResultDetail = {
+  question_id: string
+  stem: string
+  user_answer: string | string[]
+  correct_answer: string | string[]
+  is_correct: boolean
+  eval_score?: number
+  eval_feedback?: string
 }
 
 export default function QuizWidget() {
@@ -70,28 +82,15 @@ export default function QuizWidget() {
   const timer = useQuizTimer()
   const [quizAttemptId, setQuizAttemptId] = useState<number | null>(null)
   const [currentQuestionTimingId, setCurrentQuestionTimingId] = useState<number | null>(null)
-    const [currentEvaluation, setCurrentEvaluation] =
+
+  const [currentEvaluation, setCurrentEvaluation] =
     useState<EvaluateAnswerResponse | null>(null)
 
   const [evalResults, setEvalResults] = useState<
     Record<string, EvaluateAnswerResponse>
   >({})
 
-  const [detailedResults, setDetailedResults] = useState<
-    QuestionResultDetail[] | null
-  >(null)
-
-
-  type QuestionResultDetail = {
-  question_id: string
-  stem: string
-  user_answer: string | string[]
-  correct_answer: string | string[]
-  is_correct: boolean
-  eval_score?: number
-  eval_feedback?: string
-}
-
+  const [detailedResults, setDetailedResults] = useState<QuestionResultDetail[] | null>(null)
 
   useEffect(() => {
     const savedToken = localStorage.getItem("auth_token")
@@ -109,6 +108,34 @@ export default function QuizWidget() {
       loadUserStats(savedToken)
     }
   }, [])
+
+  // ✅ Chat -> Quiz event listener
+  useEffect(() => {
+    const onStart = () => {
+      const raw = localStorage.getItem("pending_quiz")
+      if (!raw) return
+
+      try {
+        const p = JSON.parse(raw)
+
+        const quizConfig: QuizConfig = {
+          mode: "quick",
+          topic: p.topic ?? "security_policy",
+          difficulty: (p.level ?? "beginner") as Difficulty,
+          useOllama: !!p.use_ollama,
+        }
+
+        handleStartQuiz(quizConfig)
+        localStorage.removeItem("pending_quiz")
+      } catch (e) {
+        console.error("[CHAT->QUIZ] pending_quiz parse failed:", e)
+      }
+    }
+
+    window.addEventListener("start-quiz-from-chat", onStart as any)
+    return () => window.removeEventListener("start-quiz-from-chat", onStart as any)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   const loadUserStats = async (token: string) => {
     try {
@@ -133,7 +160,8 @@ export default function QuizWidget() {
     console.log("[v0] Starting quiz with config:", quizConfig)
 
     try {
-      const questionCount = quizConfig.mode === "daily" ? 1 : quizConfig.mode === "quick" ? 5 : 3
+      const questionCount =
+        quizConfig.mode === "daily" ? 1 : quizConfig.mode === "quick" ? 5 : 3
 
       let apiQuestions: APIQuestion[]
 
@@ -205,362 +233,310 @@ export default function QuizWidget() {
     setError("Soru üretimi iptal edildi.")
   }
 
-/* ---------------------- API -> UI Question dönüştürücü ---------------------- */
-type RawQ = any
-const safeLower = (v: unknown) => (typeof v === "string" ? v.toLowerCase() : "")
+  /* ---------------------- API -> UI Question dönüştürücü ---------------------- */
+  type RawQ = any
+  const safeLower = (v: unknown) => (typeof v === "string" ? v.toLowerCase() : "")
 
-const convertAPIQuestionToLocal = (apiQuestion: RawQ): Question => {
-  const rawType =
-    apiQuestion?.question_type ??
-    apiQuestion?.qtype ??
-    apiQuestion?.type ??
-    apiQuestion?.meta?.qtype ??
-    "mcq"
+  const convertAPIQuestionToLocal = (apiQuestion: RawQ): Question => {
+    const rawType =
+      apiQuestion?.question_type ??
+      apiQuestion?.qtype ??
+      apiQuestion?.type ??
+      apiQuestion?.meta?.qtype ??
+      "mcq"
 
-  const typeStr = safeLower(String(rawType).replace(/[-_\s]/g, ""))
+    const typeStr = safeLower(String(rawType).replace(/[-_\s]/g, ""))
 
-  let questionType: QuestionType = "mcq"
+    let questionType: QuestionType = "mcq"
 
-  if (["short", "kisa", "kısacevap", "kisacevap", "shortanswer"].includes(typeStr)) {
-    questionType = "short_answer"
-  } else if (["senaryo", "scenario"].includes(typeStr)) {
-    questionType = "scenario"
-  } else if (["open", "openended", "acikuclu", "açıkuçlu", "acik", "açık"].includes(typeStr)) {
-    questionType = "open_ended"
-  } else if (["truefalse", "dogruyanlıs", "dogruyanlis", "true_false", "tf"].includes(typeStr)) {
-    questionType = "true_false"
-  }
-
-  // ❗ Boş scenario -> open_ended'e çevir
-  let steps = apiQuestion?.steps
-  if (questionType === "scenario") {
-    if (!Array.isArray(steps) || steps.length === 0) {
+    if (["short", "kisa", "kısacevap", "kisacevap", "shortanswer"].includes(typeStr)) {
+      questionType = "short_answer"
+    } else if (["senaryo", "scenario"].includes(typeStr)) {
+      questionType = "scenario"
+    } else if (["open", "openended", "acikuclu", "açıkuçlu", "acik", "açık"].includes(typeStr)) {
       questionType = "open_ended"
-      steps = []
-    }
-  }
-
-  const stem: string = apiQuestion?.stem ?? apiQuestion?.question ?? ""
-
-  const options: string[] = Array.isArray(apiQuestion?.choices)
-    ? apiQuestion.choices
-    : Array.isArray(apiQuestion?.options)
-    ? apiQuestion.options
-    : []
-
-  // ---------- CEVAP NORMALİZASYONU ----------
-  let correctAnswer: string | string[] = ""
-
-  // 1) Direkt string answer
-  if (typeof apiQuestion?.answer === "string" && apiQuestion.answer.trim() !== "") {
-    correctAnswer = apiQuestion.answer
-  }
-
-  // 2) answer_index (number veya string)
-  if ((!correctAnswer || correctAnswer === "") && options.length > 0) {
-    let idx: number | null = null
-
-    const rawIdx = apiQuestion?.answer_index
-    if (typeof rawIdx === "number") {
-      idx = rawIdx
-    } else if (typeof rawIdx === "string" && rawIdx.trim() !== "") {
-      const parsed = parseInt(rawIdx, 10)
-      if (!Number.isNaN(parsed)) idx = parsed
+    } else if (["truefalse", "dogruyanlıs", "dogruyanlis", "true_false", "tf"].includes(typeStr)) {
+      questionType = "true_false"
     }
 
-    // 3) correct_option_indexes / correct_option_index desteği
-    const rawCorrectIdx =
-      apiQuestion?.correct_option_indexes ?? apiQuestion?.correct_option_index
+    // ❗ Boş scenario -> open_ended'e çevir
+    let steps = apiQuestion?.steps
+    if (questionType === "scenario") {
+      if (!Array.isArray(steps) || steps.length === 0) {
+        questionType = "open_ended"
+        steps = []
+      }
+    }
 
-    if (idx === null && Array.isArray(rawCorrectIdx) && rawCorrectIdx.length > 0) {
-      const parsed = Number(rawCorrectIdx[0])
-      if (!Number.isNaN(parsed)) idx = parsed
-    } else if (
-      idx === null &&
-      (typeof rawCorrectIdx === "number" || typeof rawCorrectIdx === "string")
+    const stem: string = apiQuestion?.stem ?? apiQuestion?.question ?? ""
+
+    const options: string[] = Array.isArray(apiQuestion?.choices)
+      ? apiQuestion.choices
+      : Array.isArray(apiQuestion?.options)
+      ? apiQuestion.options
+      : []
+
+    // ---------- CEVAP NORMALİZASYONU ----------
+    let correctAnswer: string | string[] = ""
+
+    if (typeof apiQuestion?.answer === "string" && apiQuestion.answer.trim() !== "") {
+      correctAnswer = apiQuestion.answer
+    }
+
+    if ((!correctAnswer || correctAnswer === "") && options.length > 0) {
+      let idx: number | null = null
+
+      const rawIdx = apiQuestion?.answer_index
+      if (typeof rawIdx === "number") {
+        idx = rawIdx
+      } else if (typeof rawIdx === "string" && rawIdx.trim() !== "") {
+        const parsed = parseInt(rawIdx, 10)
+        if (!Number.isNaN(parsed)) idx = parsed
+      }
+
+      const rawCorrectIdx =
+        apiQuestion?.correct_option_indexes ?? apiQuestion?.correct_option_index
+
+      if (idx === null && Array.isArray(rawCorrectIdx) && rawCorrectIdx.length > 0) {
+        const parsed = Number(rawCorrectIdx[0])
+        if (!Number.isNaN(parsed)) idx = parsed
+      } else if (
+        idx === null &&
+        (typeof rawCorrectIdx === "number" || typeof rawCorrectIdx === "string")
+      ) {
+        const parsed = Number(rawCorrectIdx)
+        if (!Number.isNaN(parsed)) idx = parsed
+      }
+
+      if (idx !== null && idx >= 0 && idx < options.length) {
+        correctAnswer = options[idx]
+      }
+    }
+
+    if ((!correctAnswer || correctAnswer === "") && questionType === "true_false") {
+      if (typeof apiQuestion?.answer === "boolean") {
+        correctAnswer = String(apiQuestion.answer)
+      }
+    }
+
+    if (
+      (!correctAnswer || correctAnswer === "") &&
+      typeof apiQuestion?.expected === "string" &&
+      apiQuestion.expected.trim() !== ""
     ) {
-      const parsed = Number(rawCorrectIdx)
-      if (!Number.isNaN(parsed)) idx = parsed
+      correctAnswer = apiQuestion.expected
     }
 
-    if (idx !== null && idx >= 0 && idx < options.length) {
-      correctAnswer = options[idx]
-    }
-  }
+    console.log("[DEBUG] convertAPIQuestionToLocal", {
+      id: apiQuestion?.id,
+      type: questionType,
+      stem,
+      options,
+      answer_raw: apiQuestion?.answer,
+      answer_index: apiQuestion?.answer_index,
+      correct_option_indexes: apiQuestion?.correct_option_indexes,
+      correct_option_index: apiQuestion?.correct_option_index,
+      correctAnswer,
+    })
 
-  // 4) true/false boolean answer
-  if ((!correctAnswer || correctAnswer === "") && questionType === "true_false") {
-    if (typeof apiQuestion?.answer === "boolean") {
-      correctAnswer = String(apiQuestion.answer) // "true" / "false"
-    }
-  }
-
-  // 5) short/open ended -> expected
-  if (
-    (!correctAnswer || correctAnswer === "") &&
-    typeof apiQuestion?.expected === "string" &&
-    apiQuestion.expected.trim() !== ""
-  ) {
-    correctAnswer = apiQuestion.expected
-  }
-
-  // 🔍 Debug log – İlk birkaç denemede açık bırak, sonra istersen sil
-  console.log("[DEBUG] convertAPIQuestionToLocal", {
-    id: apiQuestion?.id,
-    type: questionType,
-    stem,
-    options,
-    answer_raw: apiQuestion?.answer,
-    answer_index: apiQuestion?.answer_index,
-    correct_option_indexes: apiQuestion?.correct_option_indexes,
-    correct_option_index: apiQuestion?.correct_option_index,
-    correctAnswer,
-  })
-
-  return {
-    rationale: apiQuestion?.rationale ?? "",
-    id: String(apiQuestion?.id ?? Math.random()),
-    type: questionType,
-    stem,
-    options,
-    // hem answer hem correctAnswer dolu olsun:
-    answer:
-      typeof correctAnswer === "string"
-        ? correctAnswer
-        : correctAnswer.length > 0
-        ? correctAnswer[0]
-        : undefined,
-    correctAnswer,
-    topic: apiQuestion?.topic ?? null,
-    level: apiQuestion?.level ?? null,
-    steps: steps ?? [],
-    meta: apiQuestion?.meta ?? {},
-    // 🔹 yeni eklendi
-    source: apiQuestion?.source ?? null,
-  }
-
-}
-
-
-  const handleAnswerSubmit = async (
-  questionId: string | number,
-  answer: string | string[],
-) => {
-  const key = String(questionId)
-  setUserAnswers((prev) => ({ ...prev, [key]: answer }))
-
-  const q = questions[currentQuestionIndex]
-  let evalResult: EvaluateAnswerResponse | null = null
-
-  // Sadece open_ended + scenario için LLM değerlendirmesi
-  if (
-    user &&
-    q &&
-    (q.type === "open_ended" || q.type === "scenario")
-  ) {
-    try {
-      const rawCorrect =
-        typeof (q as any).correctAnswer === "string"
-          ? (q as any).correctAnswer
-          : Array.isArray((q as any).correctAnswer)
-          ? (q as any).correctAnswer.join(" ")
-          : typeof (q as any).answer === "string"
-          ? (q as any).answer
-          : ""
-
-      const userText = Array.isArray(answer)
-        ? answer
-            .map((ans, idx) => `Step ${idx + 1}: ${ans}`)
-            .join("\n")
-        : String(answer)
-
-      const result = await evaluateAnswer(
-        user.access_token,
-        q.stem,
-        rawCorrect,
-        userText,
-      )
-
-      evalResult = result
-      setEvalResults((prev) => ({ ...prev, [key]: result }))
-    } catch (err) {
-      console.error(
-        "[v0] evaluateAnswer (per-question) failed:",
-        err,
-      )
+    return {
+      rationale: apiQuestion?.rationale ?? "",
+      id: String(apiQuestion?.id ?? Math.random()),
+      type: questionType,
+      stem,
+      options,
+      answer:
+        typeof correctAnswer === "string"
+          ? correctAnswer
+          : correctAnswer.length > 0
+          ? correctAnswer[0]
+          : undefined,
+      correctAnswer,
+      topic: apiQuestion?.topic ?? null,
+      level: apiQuestion?.level ?? null,
+      steps: steps ?? [],
+      meta: apiQuestion?.meta ?? {},
+      source: apiQuestion?.source ?? null,
     }
   }
 
-  setCurrentEvaluation(evalResult)
-  setShowFeedback(true)
-  setScreen("feedback")
-}
+  const handleAnswerSubmit = async (questionId: string | number, answer: string | string[]) => {
+    const key = String(questionId)
+    setUserAnswers((prev) => ({ ...prev, [key]: answer }))
 
+    const q = questions[currentQuestionIndex]
+    let evalResult: EvaluateAnswerResponse | null = null
+
+    if (user && q && (q.type === "open_ended" || q.type === "scenario")) {
+      try {
+        const rawCorrect =
+          typeof (q as any).correctAnswer === "string"
+            ? (q as any).correctAnswer
+            : Array.isArray((q as any).correctAnswer)
+            ? (q as any).correctAnswer.join(" ")
+            : typeof (q as any).answer === "string"
+            ? (q as any).answer
+            : ""
+
+        const userText = Array.isArray(answer)
+          ? answer.map((ans, idx) => `Step ${idx + 1}: ${ans}`).join("\n")
+          : String(answer)
+
+        const result = await evaluateAnswer(user.access_token, q.stem, rawCorrect, userText)
+
+        evalResult = result
+        setEvalResults((prev) => ({ ...prev, [key]: result }))
+      } catch (err) {
+        console.error("[v0] evaluateAnswer (per-question) failed:", err)
+      }
+    }
+
+    setCurrentEvaluation(evalResult)
+    setShowFeedback(true)
+    setScreen("feedback")
+  }
 
   const handleNext = async () => {
-  // bir sonraki soruda eski evaluation görünmesin
-  setCurrentEvaluation(null)
+    setCurrentEvaluation(null)
 
-  // 1) Önce mevcut sorunun timing'ini kapat
-  if (currentQuestionTimingId && user) {
-    try {
-      await endQuestionTiming(user.access_token, {
-        timing_id: currentQuestionTimingId,
-        client_end_time: new Date().toISOString(),
-      })
-      timer.endQuestion()
-    } catch (error) {
-      console.error("[v0] Failed to end question timing:", error)
+    if (currentQuestionTimingId && user) {
+      try {
+        await endQuestionTiming(user.access_token, {
+          timing_id: currentQuestionTimingId,
+          client_end_time: new Date().toISOString(),
+        })
+        timer.endQuestion()
+      } catch (error) {
+        console.error("[v0] Failed to end question timing:", error)
+      }
     }
-  }
 
-  const totalQuestions =
-    config?.mode === "daily" ? 1 : config?.mode === "quick" ? 5 : 3
+    const totalQuestions =
+      config?.mode === "daily" ? 1 : config?.mode === "quick" ? 5 : 3
 
-  // 2) Son soru değilse bir sonrakine geç
-  if (currentQuestionIndex < totalQuestions - 1) {
-    setCurrentQuestionIndex((prev) => prev + 1)
-    setShowFeedback(false)
-    setScreen("quiz")
-    return
-  }
+    if (currentQuestionIndex < totalQuestions - 1) {
+      setCurrentQuestionIndex((prev) => prev + 1)
+      setShowFeedback(false)
+      setScreen("quiz")
+      return
+    }
 
-  // 3) Buraya geldiysek quiz bitti
-  timer.endQuiz()
+    timer.endQuiz()
 
-  if (config?.mode === "daily") {
-    localStorage.setItem(
-      "lastDailyQuizCompletion",
-      new Date().toISOString(),
-    )
-  }
+    if (config?.mode === "daily") {
+      localStorage.setItem("lastDailyQuizCompletion", new Date().toISOString())
+    }
 
-  if (user && config) {
-    let correctCount = 0
+    if (user && config) {
+      let correctCount = 0
+      const detailedQuestions: QuestionResultDetail[] = []
 
-    const detailedQuestions: QuestionResultDetail[] = []
+      for (const q of questions) {
+        const key = String(q.id)
+        const userAnswer = userAnswers[key]
+        const evalForQ = evalResults[key]
 
-    for (const q of questions) {
-      const key = String(q.id)
-      const userAnswer = userAnswers[key]
-      const evalForQ = evalResults[key]
+        const rawCorrect =
+          typeof (q as any).correctAnswer === "string"
+            ? (q as any).correctAnswer
+            : Array.isArray((q as any).correctAnswer)
+            ? (q as any).correctAnswer.join(" ")
+            : typeof (q as any).answer === "string"
+            ? (q as any).answer
+            : ""
 
-      const rawCorrect =
-        typeof (q as any).correctAnswer === "string"
-          ? (q as any).correctAnswer
-          : Array.isArray((q as any).correctAnswer)
-          ? (q as any).correctAnswer.join(" ")
-          : typeof (q as any).answer === "string"
-          ? (q as any).answer
-          : ""
+        if (!userAnswer) {
+          detailedQuestions.push({
+            question_id: key,
+            stem: q.stem,
+            user_answer: "",
+            correct_answer: (q as any).correctAnswer ?? rawCorrect,
+            is_correct: false,
+          })
+          continue
+        }
 
-      if (!userAnswer) {
+        let isCorrect = false
+
+        if (q.type === "mcq" || q.type === "true_false") {
+          isCorrect =
+            String(userAnswer).toLowerCase().trim() ===
+            String(rawCorrect).toLowerCase().trim()
+        } else if (q.type === "short_answer") {
+          const norm = (s: string) => s.toLowerCase().trim().replace(/[.,!?;:]/g, "")
+          isCorrect = norm(String(userAnswer)) === norm(String(rawCorrect))
+        } else {
+          if (evalForQ) {
+            isCorrect = evalForQ.is_correct
+          } else {
+            const userWords = String(userAnswer).toLowerCase().split(/\s+/)
+            const expectedWords = String(rawCorrect).toLowerCase().split(/\s+/)
+            const matchCount = userWords.filter((w) => expectedWords.includes(w)).length
+            const similarity = matchCount / Math.max(userWords.length, expectedWords.length || 1)
+            isCorrect = similarity > 0.4
+          }
+        }
+
+        if (isCorrect) correctCount++
+
         detailedQuestions.push({
           question_id: key,
           stem: q.stem,
-          user_answer: "",
+          user_answer: userAnswer,
           correct_answer: (q as any).correctAnswer ?? rawCorrect,
-          is_correct: false,
+          is_correct: isCorrect,
+          eval_score: evalForQ?.score,
+          eval_feedback: evalForQ?.feedback,
         })
-        continue
       }
 
-      let isCorrect = false
+      setDetailedResults(detailedQuestions)
 
-      if (q.type === "mcq" || q.type === "true_false") {
-        isCorrect =
-          String(userAnswer).toLowerCase().trim() ===
-          String(rawCorrect).toLowerCase().trim()
-      } else if (q.type === "short_answer") {
-        const norm = (s: string) =>
-          s.toLowerCase().trim().replace(/[.,!?;:]/g, "")
-        isCorrect = norm(String(userAnswer)) === norm(String(rawCorrect))
-      } else {
-        // 🔥 open_ended + scenario → LLM sonucu varsa onu kullan
-        if (evalForQ) {
-          isCorrect = evalForQ.is_correct
-        } else {
-          // fallback: basit kelime benzerliği
-          const userWords = String(userAnswer)
-            .toLowerCase()
-            .split(/\s+/)
-          const expectedWords = String(rawCorrect)
-            .toLowerCase()
-            .split(/\s+/)
-          const matchCount = userWords.filter((w) =>
-            expectedWords.includes(w),
-          ).length
-          const similarity =
-            matchCount /
-            Math.max(userWords.length, expectedWords.length || 1)
-          isCorrect = similarity > 0.4
+      const totalQuestionsInResult = questions.length
+      const numericScore =
+        totalQuestionsInResult > 0 ? (correctCount / totalQuestionsInResult) * 100 : 0
+      const score = Math.round(numericScore)
+
+      if (quizAttemptId) {
+        try {
+          await endQuizTiming(user.access_token, {
+            attempt_id: quizAttemptId,
+            correct_answers: correctCount,
+            score,
+            client_end_time: new Date().toISOString(),
+            total_duration_ms: timer.totalQuizTime,
+            questions_attempted: JSON.stringify(detailedQuestions),
+          })
+        } catch (error) {
+          console.error("[v0] Failed to finalize quiz attempt:", error)
         }
       }
 
-      if (isCorrect) correctCount++
-
-      detailedQuestions.push({
-        question_id: key,
-        stem: q.stem,
-        user_answer: userAnswer,
-        correct_answer: (q as any).correctAnswer ?? rawCorrect,
-        is_correct: isCorrect,
-        eval_score: evalForQ?.score,
-        eval_feedback: evalForQ?.feedback,
-      })
-    }
-
-    setDetailedResults(detailedQuestions)
-
-    const totalQuestionsInResult = questions.length
-    const numericScore =
-      totalQuestionsInResult > 0
-        ? (correctCount / totalQuestionsInResult) * 100
-        : 0
-    const score = Math.round(numericScore)
-
-    if (quizAttemptId) {
       try {
-        await endQuizTiming(user.access_token, {
-          attempt_id: quizAttemptId,
-          correct_answers: correctCount,
-          score,
-          client_end_time: new Date().toISOString(),
-          total_duration_ms: timer.totalQuizTime,
-          questions_attempted: JSON.stringify(detailedQuestions),
-        })
+        await loadUserStats(user.access_token)
       } catch (error) {
-        console.error("[v0] Failed to finalize quiz attempt:", error)
+        console.error("[v0] Failed to reload user stats:", error)
       }
     }
 
-    try {
-      await loadUserStats(user.access_token)
-    } catch (error) {
-      console.error("[v0] Failed to reload user stats:", error)
-    }
+    setScreen("results")
   }
 
-  setScreen("results")
-}
-
-
   const handleRestart = () => {
-  setScreen("home")
-  setConfig(null)
-  setCurrentQuestionIndex(0)
-  setUserAnswers({})
-  setShowFeedback(false)
-  setQuestions([])
-  setError(null)
-  setQuizAttemptId(null)
-  setCurrentQuestionTimingId(null)
-  setCurrentEvaluation(null)
-  setEvalResults({})
-  setDetailedResults(null)
-  timer.reset()
-}
-
+    setScreen("home")
+    setConfig(null)
+    setCurrentQuestionIndex(0)
+    setUserAnswers({})
+    setShowFeedback(false)
+    setQuestions([])
+    setError(null)
+    setQuizAttemptId(null)
+    setCurrentQuestionTimingId(null)
+    setCurrentEvaluation(null)
+    setEvalResults({})
+    setDetailedResults(null)
+    timer.reset()
+  }
 
   const handleLogin = async (username: string, password: string) => {
     const response = await login(username, password)
@@ -613,6 +589,7 @@ const convertAPIQuestionToLocal = (apiQuestion: RawQ): Question => {
       }
       startTiming()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, currentQuestion, quizAttemptId, user])
 
   return (
@@ -655,26 +632,22 @@ const convertAPIQuestionToLocal = (apiQuestion: RawQ): Question => {
           </div>
         </div>
 
-        {screen === "auth" && (
-          <AuthScreen onLogin={handleLogin} onRegister={handleRegister} />
-        )}
+        {screen === "auth" && <AuthScreen onLogin={handleLogin} onRegister={handleRegister} />}
 
         {screen === "stats" && userStats && user && (
-          <StatsScreen
-            stats={userStats}
-            token={user.access_token}
-            onBack={() => setScreen("home")}
-          />
+          <StatsScreen stats={userStats} token={user.access_token} onBack={() => setScreen("home")} />
         )}
 
         {screen === "admin" && user && (
           <AdminPanel token={user.access_token} onBack={() => setScreen("home")} />
         )}
 
+        {/* ✅ Chat Screen (props fixed) */}
         {screen === "chat" && user && (
           <ChatScreen
             token={user.access_token}
-            context={config?.topic}
+            defaultTopic={config?.topic ?? "security_policy"}
+            defaultLevel={config?.difficulty ?? "beginner"}
             onBack={() => setScreen("home")}
           />
         )}
@@ -720,11 +693,7 @@ const convertAPIQuestionToLocal = (apiQuestion: RawQ): Question => {
                 </pre>
               </div>
             </div>
-            <Button
-              onClick={handleRestart}
-              variant="outline"
-              className="w-full bg-transparent"
-            >
+            <Button onClick={handleRestart} variant="outline" className="w-full bg-transparent">
               Return to Home
             </Button>
           </Card>
@@ -747,14 +716,13 @@ const convertAPIQuestionToLocal = (apiQuestion: RawQ): Question => {
             userAnswer={userAnswers[String(currentQuestion.id)]}
             onNext={handleNext}
             isLastQuestion={
-              currentQuestionIndex ===
-              (config?.mode === "daily" ? 0 : config?.mode === "quick" ? 4 : 2)
+              currentQuestionIndex === (config?.mode === "daily" ? 0 : config?.mode === "quick" ? 4 : 2)
             }
             evaluation={currentEvaluation ?? undefined}
           />
         )}
 
-          {screen === "results" && (
+        {screen === "results" && (
           <ResultsScreen
             questions={questions}
             userAnswers={userAnswers}

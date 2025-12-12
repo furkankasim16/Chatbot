@@ -1,181 +1,265 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Send, Loader2, Bot, User } from "lucide-react"
-import { sendChatMessage } from "@/lib/api"
+import { Textarea } from "@/components/ui/textarea"
+import { Loader2, Send } from "lucide-react"
+
+import {
+  getChatModes,
+  sendChatTurn,
+  type ChatMessage,
+  type ChatModeConfig,
+  type ChatTurnRequest,
+} from "@/lib/api"
 
 interface ChatScreenProps {
-  onBack: () => void
   token: string
-  context?: string
+  defaultTopic?: string
+  defaultLevel?: string
+  onBack?: () => void
 }
 
-interface Message {
-  role: "user" | "bot"
-  content: string
-  timestamp: Date
-}
+export function ChatScreen({
+  token,
+  defaultTopic = "security_policy",
+  defaultLevel = "beginner",
+  onBack,
+}: ChatScreenProps) {
+  const [modes, setModes] = useState<Record<string, ChatModeConfig>>({})
+  const [selectedMode, setSelectedMode] = useState("tutor")
+  const [topic, setTopic] = useState(defaultTopic)
+  const [level, setLevel] = useState(defaultLevel)
 
-export function ChatScreen({ onBack, token, context }: ChatScreenProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "bot",
-      content: context
-        ? `Merhaba! ${context} konusunda size nasıl yardımcı olabilirim?`
-        : "Merhaba! Size nasıl yardımcı olabilirim?",
-      timestamp: new Date(),
-    },
-  ])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
 
+  const endRef = useRef<HTMLDivElement>(null)
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50)
   }
+
+  // Load chat modes
+  useEffect(() => {
+    let ok = true
+    ;(async () => {
+      try {
+        const data = await getChatModes(token)
+        if (!ok) return
+        setModes(data)
+
+        // selectedMode yoksa ilkini seç
+        if (!data[selectedMode]) {
+          const first = Object.keys(data)[0]
+          if (first) setSelectedMode(first)
+        }
+      } catch (err) {
+        console.error(err)
+        setError("Chat modları yüklenemedi")
+      }
+    })()
+    return () => {
+      ok = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
+
+  // defaultTopic/defaultLevel değişirse sync
+  useEffect(() => {
+    setTopic(defaultTopic)
+  }, [defaultTopic])
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    setLevel(defaultLevel)
+  }, [defaultLevel])
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+    if (!input.trim()) return
+    if (!modes[selectedMode]) return
 
-    const userMessage: Message = {
+    const userMsg: ChatMessage = {
       role: "user",
       content: input.trim(),
-      timestamp: new Date(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    // UI'a hemen ekle
+    const nextHistory = [...messages, userMsg]
+    setMessages(nextHistory)
     setInput("")
     setIsLoading(true)
+    scrollToBottom()
 
     try {
-      const response = await sendChatMessage(token, input.trim(), context)
-
-      const botMessage: Message = {
-        role: "bot",
-        content: response.response,
-        timestamp: new Date(),
+      const payload: ChatTurnRequest = {
+        mode: selectedMode,
+        topic,
+        level,
+        message: userMsg.content,
+        history: messages, // backend history'yi system prompt ile birleştiriyor; istersek nextHistory de gönderebiliriz
       }
 
-      setMessages((prev) => [...prev, botMessage])
-    } catch (error) {
-      console.error("[v0] Chat error:", error)
+      const resp = await sendChatTurn(token, payload)
 
-      let errorContent = "⚠️ Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
+      const botMsg: ChatMessage = {
+        role: "assistant",
+        content: resp.reply,
+      }
 
-      if (error instanceof Error) {
-        if (error.message.includes("zaman aşımına")) {
-          errorContent =
-            "⏱️ İstek zaman aşımına uğradı. AI yanıt üretirken çok uzun sürdü. Lütfen daha kısa bir mesaj deneyin veya backend'in çalıştığından emin olun."
-        } else if (error.message.includes("gönderilemedi")) {
-          errorContent = "🔌 Backend'e bağlanılamadı. Lütfen backend sunucusunun çalıştığından emin olun."
+      setMessages((prev) => [...prev, botMsg])
+      setSuggestions(resp.suggestions || [])
+      setError(null)
+
+      // ✅ Chat -> Quiz aksiyonu varsa yakala (backend response'da actions alanı varsa)
+      const actions = (resp as any)?.actions
+      if (Array.isArray(actions)) {
+        const start = actions.find((a: any) => a?.type === "start_quiz")
+        if (start?.payload) {
+          localStorage.setItem("pending_quiz", JSON.stringify(start.payload))
+          window.dispatchEvent(new Event("start-quiz-from-chat"))
         }
       }
-
-      const errorMessage: Message = {
-        role: "bot",
-        content: errorContent,
-        timestamp: new Date(),
-      }
-
-      setMessages((prev) => [...prev, errorMessage])
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || "Mesaj gönderilemedi")
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+      scrollToBottom()
     }
   }
 
   return (
-    <div className="animate-fade-in space-y-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Chat Modu</h2>
-          <p className="text-sm text-muted-foreground">
-            Yapay zeka ile sohbet edin (Yanıt süresi 30-60 saniye sürebilir)
-          </p>
-        </div>
-      </div>
+    <div className="flex gap-4">
+      {/* Left Control Panel */}
+      <aside className="w-64">
+        <Card className="p-4 space-y-4">
+          {onBack && (
+            <Button variant="outline" size="sm" onClick={onBack}>
+              Geri
+            </Button>
+          )}
 
-      <Card className="p-4 h-[500px] flex flex-col">
-        <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-          {messages.map((message, index) => (
-            <div key={index} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-              {message.role === "bot" && (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-primary-foreground" />
-                </div>
-              )}
+          <div>
+            <p className="text-xs font-semibold mb-1">Chat Modu</p>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(modes).map(([key, m]) => (
+                <button
+                  key={key}
+                 onClick={() => {
+                      setSelectedMode(key)
+                      setMessages([])        // ✅ mode değişince geçmişi temizle
+                      setSuggestions([])
+                      setError(null)
+                    }}
+                  className={`px-2 py-1 rounded border text-xs ${
+                    selectedMode === key
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted hover:bg-muted/70"
+                  }`}
+                >
+                  {m.title}
+                </button>
+              ))}
+            </div>
+          </div>
 
+          <div>
+            <p className="text-xs font-semibold mb-1">Topic</p>
+            <Input
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="h-8 text-xs"
+            />
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold mb-1">Level</p>
+            <Input
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+              className="h-8 text-xs"
+            />
+          </div>
+
+          {modes[selectedMode] && (
+            <p className="text-[11px] opacity-70">
+              {modes[selectedMode].description}
+            </p>
+          )}
+        </Card>
+      </aside>
+
+      {/* Right Chat Panel */}
+      <div className="flex-1 flex flex-col">
+        <Card className="flex-1 flex flex-col p-4">
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {messages.map((msg, i) => (
               <div
-                className={`max-w-[80%] rounded-lg p-3 ${
-                  message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                key={i}
+                className={`max-w-[80%] px-3 py-2 rounded ${
+                  msg.role === "user"
+                    ? "ml-auto bg-primary text-primary-foreground"
+                    : "mr-auto bg-muted"
                 }`}
               >
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                <p className="text-xs opacity-70 mt-1">
-                  {message.timestamp.toLocaleTimeString("tr-TR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
+                {msg.content}
               </div>
+            ))}
 
-              {message.role === "user" && (
-                <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-accent-foreground" />
-                </div>
-              )}
-            </div>
-          ))}
+            {isLoading && (
+              <div className="mr-auto bg-muted px-3 py-2 rounded flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-xs">Yanıt oluşturuluyor...</span>
+              </div>
+            )}
 
-          {isLoading && (
-            <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                <Bot className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <div className="bg-muted rounded-lg p-3">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Yanıt üretiliyor...</span>
-                </div>
-              </div>
+            <div ref={endRef} />
+          </div>
+
+          {error && <p className="text-xs text-destructive mt-2">{error}</p>}
+
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {suggestions.map((s, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setInput(s)}
+                  className="border rounded px-2 py-1 text-[11px] bg-muted hover:bg-muted/70"
+                >
+                  {s}
+                </button>
+              ))}
             </div>
           )}
 
-          <div ref={messagesEndRef} />
-        </div>
+          <div className="mt-3 flex gap-2">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              className="flex-1 min-h-[40px]"
+              placeholder="Mesaj yaz..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
+            />
 
-        <div className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Mesajınızı yazın..."
-            disabled={isLoading}
-            className="flex-1"
-          />
-          <Button onClick={handleSend} disabled={!input.trim() || isLoading} size="icon">
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </Button>
-        </div>
-      </Card>
+            <Button onClick={handleSend} disabled={!input.trim() || isLoading}>
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send />
+              )}
+            </Button>
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }

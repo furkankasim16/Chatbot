@@ -22,7 +22,7 @@ def init_app_db():
         CREATE TABLE IF NOT EXISTS users(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT UNIQUE NOT NULL,
-          email TEXT UNIQUE NOT NULL,
+          email TEXT UNIQUE NOT NULL,l
           hashed_password TEXT NOT NULL,
           is_admin INTEGER DEFAULT 0,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -73,3 +73,29 @@ def init_app_db():
               created_at TEXT DEFAULT CURRENT_TIMESTAMP
           );
           """)
+        c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id          TEXT PRIMARY KEY,           -- uuid
+            user_id     INTEGER,
+            mode        TEXT NOT NULL,              -- "tutor", "playground" vs
+            topic       TEXT,
+            level       TEXT,
+            language    TEXT,
+            is_active   INTEGER NOT NULL DEFAULT 1, -- 1: aktif, 0: kapalı
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT
+        );
+        """)  
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id  TEXT NOT NULL,
+                role        TEXT NOT NULL,              -- "user" | "assistant" | "system"
+                content     TEXT NOT NULL,
+                created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (session_id) REFERENCES chat_sessions(id)
+            );
+            """
+        )

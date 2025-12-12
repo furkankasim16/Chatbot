@@ -10,21 +10,18 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Loader2 } from "lucide-react"
-import type { Question } from "@/app/types/quiz"
+import type { Question, QuestionType } from "@/app/types/quiz"
 
 interface QuizInterfaceProps {
   question: Question
   questionNumber: number
   totalQuestions: number
-  // 🔥 async de destekle
   onSubmit: (
     questionId: string | number,
     answer: string | string[],
   ) => void | Promise<void>
   questionTime?: number
   formatTime?: (ms: number) => string
-
-  // Opsiyonel (dışarıdan MCQ seçimini kontrol etmek istersen)
   selected?: number | null
   setSelected?: (v: number | null) => void
 }
@@ -57,8 +54,7 @@ export function QuizInterface({
 
   const typeStr = String(rawType).toLowerCase().replace(/[-_\s]/g, "")
 
-  let qtype: "mcq" | "true_false" | "short_answer" | "open_ended" | "scenario" =
-    "mcq"
+  let qtype: QuestionType = "mcq"
 
   if (["truefalse", "dogruyanlıs", "dogruyanlis", "true_false", "tf"].includes(typeStr)) {
     qtype = "true_false"
@@ -74,7 +70,7 @@ export function QuizInterface({
 
   const stem: string = raw.stem ?? raw.question ?? ""
   const options: string[] = raw.options ?? raw.choices ?? []
-
+  const scenarioText: string | undefined = raw.scenario ?? undefined
   const steps = raw.steps as any[] | undefined
 
   // Eğer parent'tan selected gelmediyse burada yönet
@@ -87,14 +83,54 @@ export function QuizInterface({
   const [scenarioAnswers, setScenarioAnswers] = useState<Record<number, string>>({})
   const [currentStep, setCurrentStep] = useState(1)
 
-  // 🔥 yeni: submit sırasında kilitlemek için
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const progress = (questionNumber / totalQuestions) * 100
 
+  // --- SCENARIO yardımcı değişkenler ---
+  const hasSteps = Array.isArray(steps) && steps.length > 0
+  const currentStepIndex = currentStep - 1
+  const currentStepObj: any = hasSteps ? steps[currentStepIndex] ?? {} : {}
+  const currentStepAnswer: string = scenarioAnswers[currentStep] || ""
+
+  const normalizeStepType = (val: any): QuestionType | null => {
+  if (!val) return null
+  const s = String(val).toLowerCase().replace(/[-_\s]/g, "")
+
+  // step seviyesinde geçerli tipler:
+  if (["truefalse", "tf", "dogruyanlis", "dogruyanlıs"].includes(s)) {
+    return "true_false"
+  }
+
+  if (["short", "kisa", "kisacevap", "kısacevap", "shortanswer"].includes(s)) {
+    return "short_answer"
+  }
+
+  if (["open", "openended", "acikuclu", "açıkuçlu", "acik", "açık"].includes(s)) {
+    return "open_ended"
+  }
+
+  if (["mcq", "coktansecmeli", "çoktansecmeli", "coktansec"].includes(s)) {
+    return "mcq"
+  }
+
+  // "scenario" dahil bilmediğin her şey → null (textarea)
+  return null
+}
+
+
+  const stepType: QuestionType | null = normalizeStepType(
+    currentStepObj.step_type ?? currentStepObj.type,
+  )
+  const stepOptions: string[] = currentStepObj.options ?? []
+   const stepSelectedIndex = stepOptions.findIndex(
+    (opt) => opt === currentStepAnswer,
+  )
+  const stepSelectedValue =
+    stepSelectedIndex >= 0 ? String(stepSelectedIndex) : ""
   // --- Gönderim ---
   const handleSubmit = async () => {
-    if (isSubmitting) return // ikinci tıklamayı engelle
+    if (isSubmitting) return
 
     const qid = raw.id ?? ""
 
@@ -102,7 +138,7 @@ export function QuizInterface({
     try {
       if (qtype === "scenario") {
         const allAnswers = Object.values(scenarioAnswers)
-        await onSubmit(qid, allAnswers)
+        await onSubmit(qid, allAnswers as unknown as string[])
         return
       }
 
@@ -113,10 +149,8 @@ export function QuizInterface({
         return
       }
 
-      // true_false, short_answer, open_ended
       await onSubmit(qid, textAnswer)
     } finally {
-      // component ekrandan kalksa bile ekstra zararı yok
       setIsSubmitting(false)
     }
   }
@@ -125,7 +159,6 @@ export function QuizInterface({
     if (steps && currentStep < steps.length) {
       setCurrentStep((prev) => prev + 1)
     } else {
-      // Son adım → submit (LLM call burada)
       await handleSubmit()
     }
   }
@@ -190,7 +223,7 @@ export function QuizInterface({
                 value={
                   effectiveSelected != null ? String(effectiveSelected) : ""
                 }
-                onValueChange={(val) => {
+                onValueChange={(val : string) => {
                   const idx = parseInt(val)
                   if (!isNaN(idx)) setEffectiveSelected(idx)
                 }}
@@ -256,7 +289,7 @@ export function QuizInterface({
               <div className="flex items-center justify-between">
                 <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
                   Scenario - Step {currentStep} of{" "}
-                  {Array.isArray(steps) && steps.length > 0 ? steps.length : 1}
+                  {hasSteps ? steps!.length : 1}
                 </div>
 
                 <Badge variant="outline" className="flex items-center gap-1.5">
@@ -265,49 +298,133 @@ export function QuizInterface({
                 </Badge>
               </div>
 
+              {scenarioText && (
+                <p className="text-sm text-muted-foreground whitespace-pre-line">
+                  {scenarioText}
+                </p>
+              )}
+
               <h2 className="text-2xl font-semibold whitespace-pre-line">
                 {stem}
               </h2>
             </div>
 
             <div className="space-y-4">
-              {Array.isArray(steps) &&
-                steps.length > 0 &&
-                (() => {
-                  const step = steps[currentStep - 1] || {}
-                  const stepText = step.prompt ?? step.stem ?? ""
-                  return (
-                    <div className="p-4 rounded-lg bg-muted/50 border">
-                      <p className="text-sm font-medium mb-2">
-                        Step {currentStep}
-                      </p>
-                      <p className="text-base whitespace-pre-line">
-                        {stepText}
-                      </p>
-                    </div>
-                  )
-                })()}
+              {/* Step açıklaması */}
+              {hasSteps && (
+                <div className="p-4 rounded-lg bg-muted/50 border">
+                  <p className="text-sm font-medium mb-2">
+                    Step {currentStep}
+                    {stepType ? ` (${stepType})` : ""}
+                  </p>
+                  <p className="text-base whitespace-pre-line">
+                    {currentStepObj.prompt ?? currentStepObj.stem ?? ""}
+                  </p>
+                </div>
+              )}
 
-              {/* steps olsun olmasın her zaman textarea gösteriyoruz */}
-              <Textarea
-                value={scenarioAnswers[currentStep] || ""}
-                onChange={(e) =>
-                  setScenarioAnswers((prev) => ({
-                    ...prev,
-                    [currentStep]: e.target.value,
-                  }))
-                }
-                placeholder="Describe your approach for this step..."
-                className="min-h-32"
-              />
+              {/* Step'e göre input tipi */}
+
+              {/* MCQ step */}
+                {stepType === "mcq" && stepOptions.length > 0 && (
+                  <RadioGroup
+                    value={stepSelectedValue}
+                    onValueChange={(val: string) => {
+                      const idx = parseInt(val)
+                      const chosen = !isNaN(idx) ? stepOptions[idx] : ""
+                      setScenarioAnswers((prev) => ({
+                        ...prev,
+                        [currentStep]: chosen,
+                      }))
+                    }}
+                    className="space-y-3"
+                  >
+                    {stepOptions.map((opt, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start space-x-3 p-4 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                        onClick={() =>
+                          setScenarioAnswers((prev) => ({
+                            ...prev,
+                            [currentStep]: stepOptions[index] ?? "",
+                          }))
+                        }
+                      >
+                        <RadioGroupItem
+                          value={String(index)}
+                          id={`step-${currentStep}-opt-${index}`}
+                        />
+                        <Label
+                          htmlFor={`step-${currentStep}-opt-${index}`}
+                          className="flex-1 cursor-pointer"
+                        >
+                          {opt}
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                )}
+
+              {/* True / False step */}
+              {stepType === "true_false" && (
+                <RadioGroup
+                  value={currentStepAnswer}
+                  onValueChange={(val) =>
+                    setScenarioAnswers((prev) => ({
+                      ...prev,
+                      [currentStep]: val,
+                    }))
+                  }
+                  className="space-y-3"
+                >
+                  {["true", "false"].map((opt) => (
+                    <div
+                      key={opt}
+                      className="flex items-center space-x-3 p-4 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                      onClick={() =>
+                        setScenarioAnswers((prev) => ({
+                          ...prev,
+                          [currentStep]: opt,
+                        }))
+                      }
+                    >
+                      <RadioGroupItem
+                        value={opt}
+                        id={`step-${currentStep}-${opt}`}
+                      />
+                      <Label
+                        htmlFor={`step-${currentStep}-${opt}`}
+                        className="flex-1 capitalize text-lg"
+                      >
+                        {opt}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              )}
+
+              {/* Short / Open ended veya bilinmeyen tip → textarea */}
+              {(stepType === "short_answer" ||
+                stepType === "open_ended" ||
+                stepType === null) && (
+                <Textarea
+                  value={currentStepAnswer}
+                  onChange={(e) =>
+                    setScenarioAnswers((prev) => ({
+                      ...prev,
+                      [currentStep]: e.target.value,
+                    }))
+                  }
+                  placeholder="Describe your approach for this step..."
+                  className="min-h-32"
+                />
+              )}
             </div>
           </>
         )}
 
         <Button
-          onClick={
-            qtype === "scenario" ? handleScenarioNext : handleSubmit
-          }
+          onClick={qtype === "scenario" ? handleScenarioNext : handleSubmit}
           disabled={!isAnswerValid() || isSubmitting}
           className="w-full h-12"
           size="lg"
@@ -318,7 +435,7 @@ export function QuizInterface({
               Cevap değerlendiriliyor...
             </>
           ) : qtype === "scenario" &&
-            Array.isArray(steps) &&
+            hasSteps &&
             currentStep < (steps?.length || 1) ? (
             "Next Step"
           ) : (

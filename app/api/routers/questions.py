@@ -4,11 +4,11 @@ from typing import Any, Optional, List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-
+from starlette import status
 from app.api.deps import on_start_questions_db
 from app.core.db import questions_cursor
-from app.domain.schemas.question import QuestionModel
-from app.domain.repositories.quesitons_repo import get_all_questions, get_random, map_level_to_db_difficulty
+from app.domain.schemas.question import QuestionModel, QuestionUpdate
+from app.domain.repositories.quesitons_repo import get_all_questions, get_random, map_level_to_db_difficulty, update_question_in_db
 from app.domain.services.question_generation import generate_question_from_llm
 
 router = APIRouter(prefix="/questions", tags=["questions"])
@@ -87,3 +87,17 @@ async def generate_question(
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.patch("/{question_id}", response_model=QuestionModel)
+def update_question(
+    question_id: int,
+    data: QuestionUpdate,
+    _=Depends(on_start_questions_db),
+):
+    updated = update_question_in_db(question_id, data)
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Question not found or nothing to update",
+        )
+    return updated
