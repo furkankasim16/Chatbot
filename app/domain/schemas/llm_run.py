@@ -13,6 +13,7 @@ class LLMRun(BaseModel):
     token_input: Optional[int] = None
     token_output: Optional[int] = None
     created_at: Optional[str] = None
+    is_success: bool = True
 
 class LLMStatsSummary(BaseModel):
     model_name: str
@@ -22,3 +23,5 @@ class LLMStatsSummary(BaseModel):
     max_latency_ms: Optional[int]
     avg_input_tokens: Optional[float]
     avg_output_tokens: Optional[float]
+    success_calls: Optional[int] = 0
+    success_rate: Optional[float] = 0.0

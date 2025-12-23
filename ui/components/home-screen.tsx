@@ -105,8 +105,8 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
   return (
     <div className="animate-fade-in space-y-8">
       <div className="text-center space-y-3">
-        <h2 className="text-4xl font-bold text-foreground text-balance">Choose Your Learning Path</h2>
-        <p className="text-muted-foreground text-lg">Select a quiz mode and customize your learning experience</p>
+        <h2 className="text-4xl font-bold text-foreground text-balance">Öğrenme Yolunu Seç</h2>
+        <p className="text-muted-foreground text-lg">Bir quiz modu seç ve öğrenme deneyimini özelleştir</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -118,9 +118,8 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
           return (
             <Card
               key={mode.id}
-              className={`p-6 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-                isSelected ? "ring-2 ring-primary shadow-lg" : ""
-              } ${isDisabled ? "opacity-50 cursor-not-allowed hover:scale-100" : ""}`}
+              className={`p-6 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${isSelected ? "ring-2 ring-primary shadow-lg" : ""
+                } ${isDisabled ? "opacity-50 cursor-not-allowed hover:scale-100" : ""}`}
               onClick={() => !isDisabled && setSelectedMode(mode.id)}
             >
               <div className="space-y-4">
@@ -135,7 +134,7 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
                 <div className="space-y-2">
                   <h3 className="text-xl font-semibold text-card-foreground">{mode.title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {isDisabled ? `Available in ${nextDailyTime}` : mode.description}
+                    {isDisabled ? `${nextDailyTime} içinde erişilebilir` : mode.description}
                   </p>
                 </div>
               </div>
@@ -158,23 +157,23 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
 
       {selectedMode && (
         <Card className="p-6 animate-slide-in space-y-6">
-          <h3 className="text-lg font-semibold text-card-foreground">Customize Your Quiz</h3>
+          <h3 className="text-lg font-semibold text-card-foreground">Quiz'ini Özelleştir</h3>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Topic</label>
+              <label className="text-sm font-medium text-foreground">Konu</label>
               <Select value={topic} onValueChange={setTopic} disabled={topicsLoading}>
                 <SelectTrigger>
                   <SelectValue>
                     {topicsLoading ? (
                       <span className="flex items-center gap-2 text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading topics...
+                        Konular yükleniyor...
                       </span>
                     ) : topic ? (
                       formatTopicName(topic)
                     ) : (
-                      <span className="text-muted-foreground">Select a topic</span>
+                      <span className="text-muted-foreground">Bir konu seç</span>
                     )}
                   </SelectValue>
                 </SelectTrigger>
@@ -183,22 +182,22 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
                     <SelectItem value="loading" disabled>
                       <div className="flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading topics...
+                        Konular yükleniyor...
                       </div>
                     </SelectItem>
                   ) : topicsError ? (
                     <SelectItem value="error" disabled>
-                      Error loading topics
+                      Konular yüklenirken hata oluştu
                     </SelectItem>
                   ) : availableTopics.length === 0 ? (
                     <SelectItem value="no-topics" disabled>
-                      No topics available
+                      Mevcut konu yok
                     </SelectItem>
                   ) : (
                     availableTopics.map((t) => (
                       <SelectItem key={t} value={t}>
                         {formatTopicName(t)}
-                        {topicsData?.topics[t] && ` (${topicsData.topics[t]} questions)`}
+                        {topicsData?.topics[t] && ` (${topicsData.topics[t]} soru)`}
                       </SelectItem>
                     ))
                   )}
@@ -207,17 +206,17 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Difficulty</label>
+              <label className="text-sm font-medium text-foreground">Zorluk</label>
               <Select value={difficulty} onValueChange={(v) => setDifficulty(v as Difficulty)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="beginner">Beginner</SelectItem>
-                  <SelectItem value="intermediate">Intermediate</SelectItem>
-                  <SelectItem value="advanced">Advanced</SelectItem>
+                  <SelectItem value="beginner">Başlangıç</SelectItem>
+                  <SelectItem value="intermediate">Orta</SelectItem>
+                  <SelectItem value="advanced">İleri</SelectItem>
                   {/* 🔥 Yeni mixed seviye */}
-                  <SelectItem value="mixed">Mixed (All Levels)</SelectItem>
+                  <SelectItem value="mixed">Karışık (Tüm Seviyeler)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -249,8 +248,8 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
             disabled={selectedMode === "daily" && !isDailyAvailable}
           >
             {selectedMode === "daily" && !isDailyAvailable
-              ? `Available in ${nextDailyTime}`
-              : "Start Quiz"}
+              ? `${nextDailyTime} içinde erişilebilir`
+              : "Quiz'e Başla"}
           </Button>
         </Card>
       )}

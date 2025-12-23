@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import {
   Loader2,
   Sparkles,
@@ -21,6 +22,7 @@ import {
   Users,
   Brain,
   ListChecks,
+  Database,
 } from "lucide-react"
 import {
   generateRandomQuestion,
@@ -34,6 +36,7 @@ import { AuditLogsTable } from "@/components/audit-logs-table"
 import { AdminLlmStats } from "@/components/admin-llm-stats"
 import { LlmPerformanceChart } from "@/components/admin-llm-stats-chart"
 import { AdminQuestionBank } from "@/components/admin-question-bank"
+import { KnowledgeBaseTab } from "@/components/knowledge-base-tab"
 
 interface AdminPanelProps {
   token: string
@@ -42,7 +45,7 @@ interface AdminPanelProps {
 
 export function AdminPanel({ token, onBack }: AdminPanelProps) {
   const [currentView, setCurrentView] = useState<
-    "generate" | "activity" | "audit" | "llmStats" | "questionBank"
+    "generate" | "activity" | "audit" | "llmStats" | "questionBank" | "knowledgeBase"
   >("generate")
 
   const [isGenerating, setIsGenerating] = useState(false)
@@ -55,6 +58,7 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
   const [questionType, setQuestionType] = useState<string>("mcq")
   const [topic, setTopic] = useState<string>("")
   const [difficulty, setDifficulty] = useState<string>("beginner")
+  const [useRag, setUseRag] = useState<boolean>(false)
 
   // ⭐ LLM MODEL SEÇİMİ
   const [llmModel, setLlmModel] = useState<string>("ollama:llama3")
@@ -98,6 +102,7 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
         difficulty,
         questionType,
         llmModel,
+        useRag
       )
       const question = (response as any).question || response
 
@@ -203,6 +208,7 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
             variant={currentView === "audit" ? "default" : "outline"}
             onClick={() => setCurrentView("audit")}
           >
+            <LoglarIcon />
             Loglar
           </Button>
 
@@ -213,14 +219,22 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
             <Brain className="w-4 h-4 mr-2" />
             LLM Performans
           </Button>
-          
+
           <Button
-          variant={currentView === "questionBank" ? "default" : "outline"}
-          onClick={() => setCurrentView("questionBank")}
-        >
-          <ListChecks className="w-4 h-4 mr-2" />
-          Soru Bankası
-        </Button>
+            variant={currentView === "questionBank" ? "default" : "outline"}
+            onClick={() => setCurrentView("questionBank")}
+          >
+            <ListChecks className="w-4 h-4 mr-2" />
+            Soru Bankası
+          </Button>
+
+          <Button
+            variant={currentView === "knowledgeBase" ? "default" : "outline"}
+            onClick={() => setCurrentView("knowledgeBase")}
+          >
+            <Database className="w-4 h-4 mr-2" />
+            Bilgi Bankası
+          </Button>
         </div>
       </div>
 
@@ -231,12 +245,14 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
         <AuditLogsTable token={token} />
       ) : currentView === "llmStats" ? (
         <div className="space-y-6">
-          <AdminLlmStats />
-          <LlmPerformanceChart />
+          <AdminLlmStats token={token} />
+          <LlmPerformanceChart token={token} />
         </div>
       ) : currentView === "questionBank" ? (
-          <AdminQuestionBank token={token} />
-        ) : (
+        <AdminQuestionBank token={token} />
+      ) : currentView === "knowledgeBase" ? (
+        <KnowledgeBaseTab token={token} />
+      ) : (
         <>
           {error && (
             <Card className="p-4 border-destructive/50 bg-destructive/10">
@@ -261,13 +277,15 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
                   <SelectValue placeholder="Model seçin" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ollama:llama3">Ollama (Local)</SelectItem>
+                  <SelectItem value="ollama:llama3:instruct">Ollama - Llama 3 (Instruct)</SelectItem>
+                  <SelectItem value="ollama:phi3:medium">Ollama - Phi-3 Medium</SelectItem>
+                  <SelectItem value="ollama:gpt-oss:20b">Ollama - GPT-OSS 20B (Local)</SelectItem>
+                  <SelectItem value="ollama:mistral:latest">Ollama - Mistral</SelectItem>
+                  <SelectItem value="ollama:gpt-oss:120b-cloud">Ollama - GPT-OSS 120B (Cloud)</SelectItem>
                   <SelectItem value="llama-3.1-8b-instant">
                     Groq - LLaMA3 70B
                   </SelectItem>
-                  <SelectItem value="openai_gpt4o">
-                    OpenAI GPT-4o
-                  </SelectItem>
+
                   <SelectItem value="gemini-2.0-flash">
                     Google - Gemini 2.0 Flash
                   </SelectItem>
@@ -343,6 +361,22 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
                       <SelectItem value="scenario">Senaryo</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="flex items-center space-x-2 border p-3 rounded-lg bg-muted/20">
+                  <Switch
+                    id="rag-mode"
+                    checked={useRag}
+                    onCheckedChange={setUseRag}
+                  />
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="rag-mode" className="cursor-pointer font-medium">
+                      Knowledge Base (RAG) Kullan
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      Aktif edilirse, sistem "Konu" başlığını Bilgi Bankası'nda arar ve bulunan içeriğe göre soru üretir.
+                    </p>
+                  </div>
                 </div>
 
                 <Button
@@ -465,9 +499,10 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
                   <b>Soru:</b> {generatedQuestion.stem}
                 </p>
 
-                {(generatedQuestion as any).choices && (
+                {/* Handle choices/options */}
+                {((generatedQuestion as any).choices || (generatedQuestion as any).options) && (
                   <ul className="list-disc list-inside">
-                    {(generatedQuestion as any).choices.map(
+                    {((generatedQuestion as any).choices || (generatedQuestion as any).options).map(
                       (c: string, i: number) => (
                         <li key={i}>{c}</li>
                       ),
@@ -475,20 +510,41 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
                   </ul>
                 )}
 
+                {/* Handle Correct Answer */}
                 <p>
                   <b>Doğru Cevap:</b>{" "}
-                  {(generatedQuestion as any).answer_index !== undefined
-                    ? (generatedQuestion as any).choices?.[
-                        (generatedQuestion as any).answer_index
-                      ]
-                    : "Belirtilmemiş"}
+                  {(() => {
+                    const q = generatedQuestion as any
+                    const opts = q.choices || q.options
+                    const idx = q.answer_index ?? q.correct_option_indexes?.[0]
+
+                    if (opts && idx !== undefined && opts[idx]) {
+                      return opts[idx]
+                    }
+                    if (q.answer !== undefined) {
+                      return String(q.answer)
+                    }
+                    if (q.correct_answer !== undefined) {
+                      return String(q.correct_answer)
+                    }
+                    return "Belirtilmemiş"
+                  })()}
                 </p>
 
-                {(generatedQuestion as any).rationale && (
+                {/* Handle Explanation/Rationale */}
+                {((generatedQuestion as any).rationale || (generatedQuestion as any).explanation) && (
                   <p>
                     <b>Açıklama:</b>{" "}
-                    {(generatedQuestion as any).rationale}
+                    {(generatedQuestion as any).rationale || (generatedQuestion as any).explanation}
                   </p>
+                )}
+
+                {/* Handle Source Context */}
+                {(generatedQuestion as any).source_context && (
+                  <div className="mt-4 p-3 bg-blue-50/50 dark:bg-blue-900/20 text-xs rounded border border-blue-100 dark:border-blue-900/50 text-muted-foreground">
+                    <p className="font-semibold text-blue-600 dark:text-blue-400 mb-1">Kaynak Bağlamı (RAG):</p>
+                    {(generatedQuestion as any).source_context}
+                  </div>
                 )}
               </div>
 
@@ -513,7 +569,32 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
             </Card>
           )}
         </>
-      )}
-    </div>
+      )
+      }
+    </div >
+  )
+}
+
+// Helper icon component for Logs (assuming it wasn't imported or I missed it in the original file)
+function LoglarIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-4 h-4 mr-2"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
+    </svg>
   )
 }

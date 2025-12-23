@@ -17,7 +17,7 @@ import type {
   Question as APIQuestion,
   UserStats,
   LoginResponse,
-  EvaluateAnswerResponse,
+  EvaluateAnswerOut as EvaluateAnswerResponse,
 } from "@/lib/api"
 
 import {
@@ -61,6 +61,12 @@ type QuestionResultDetail = {
   is_correct: boolean
   eval_score?: number
   eval_feedback?: string
+  rubric?: Array<{
+    criteria: string
+    score: number
+    max_score: number
+    feedback: string
+  }>
 }
 
 export default function QuizWidget() {
@@ -273,43 +279,54 @@ export default function QuizWidget() {
     const options: string[] = Array.isArray(apiQuestion?.choices)
       ? apiQuestion.choices
       : Array.isArray(apiQuestion?.options)
-      ? apiQuestion.options
-      : []
+        ? apiQuestion.options
+        : []
 
     // ---------- CEVAP NORMALİZASYONU ----------
     let correctAnswer: string | string[] = ""
 
-    if (typeof apiQuestion?.answer === "string" && apiQuestion.answer.trim() !== "") {
+    // 1. Array cevap kontrolü (backend ["Daily Scrum", "Günlük Scrum"] dönebilir)
+    if (Array.isArray(apiQuestion?.answer) && apiQuestion.answer.length > 0) {
+      correctAnswer = apiQuestion.answer
+    }
+    // 2. String cevap kontrolü
+    else if (typeof apiQuestion?.answer === "string" && apiQuestion.answer.trim() !== "") {
       correctAnswer = apiQuestion.answer
     }
 
+    // 3. Answer index veya options üzerinden bulma logic'i (MCQ için)
     if ((!correctAnswer || correctAnswer === "") && options.length > 0) {
-      let idx: number | null = null
+      if (questionType === "short_answer") {
+        // Short answer için options genellikle kabul edilen cevaplar listesidir
+        correctAnswer = options
+      } else {
+        let idx: number | null = null
+        const rawIdx = apiQuestion?.answer_index
+        // ... (existing parsing logic) ...
+        if (typeof rawIdx === "number") {
+          idx = rawIdx
+        } else if (typeof rawIdx === "string" && rawIdx.trim() !== "") {
+          const parsed = parseInt(rawIdx, 10)
+          if (!Number.isNaN(parsed)) idx = parsed
+        }
 
-      const rawIdx = apiQuestion?.answer_index
-      if (typeof rawIdx === "number") {
-        idx = rawIdx
-      } else if (typeof rawIdx === "string" && rawIdx.trim() !== "") {
-        const parsed = parseInt(rawIdx, 10)
-        if (!Number.isNaN(parsed)) idx = parsed
-      }
+        const rawCorrectIdx =
+          apiQuestion?.correct_option_indexes ?? apiQuestion?.correct_option_index
 
-      const rawCorrectIdx =
-        apiQuestion?.correct_option_indexes ?? apiQuestion?.correct_option_index
+        if (idx === null && Array.isArray(rawCorrectIdx) && rawCorrectIdx.length > 0) {
+          const parsed = Number(rawCorrectIdx[0])
+          if (!Number.isNaN(parsed)) idx = parsed
+        } else if (
+          idx === null &&
+          (typeof rawCorrectIdx === "number" || typeof rawCorrectIdx === "string")
+        ) {
+          const parsed = Number(rawCorrectIdx)
+          if (!Number.isNaN(parsed)) idx = parsed
+        }
 
-      if (idx === null && Array.isArray(rawCorrectIdx) && rawCorrectIdx.length > 0) {
-        const parsed = Number(rawCorrectIdx[0])
-        if (!Number.isNaN(parsed)) idx = parsed
-      } else if (
-        idx === null &&
-        (typeof rawCorrectIdx === "number" || typeof rawCorrectIdx === "string")
-      ) {
-        const parsed = Number(rawCorrectIdx)
-        if (!Number.isNaN(parsed)) idx = parsed
-      }
-
-      if (idx !== null && idx >= 0 && idx < options.length) {
-        correctAnswer = options[idx]
+        if (idx !== null && idx >= 0 && idx < options.length) {
+          correctAnswer = options[idx]
+        }
       }
     }
 
@@ -333,9 +350,6 @@ export default function QuizWidget() {
       stem,
       options,
       answer_raw: apiQuestion?.answer,
-      answer_index: apiQuestion?.answer_index,
-      correct_option_indexes: apiQuestion?.correct_option_indexes,
-      correct_option_index: apiQuestion?.correct_option_index,
       correctAnswer,
     })
 
@@ -349,8 +363,8 @@ export default function QuizWidget() {
         typeof correctAnswer === "string"
           ? correctAnswer
           : correctAnswer.length > 0
-          ? correctAnswer[0]
-          : undefined,
+            ? correctAnswer[0]
+            : undefined,
       correctAnswer,
       topic: apiQuestion?.topic ?? null,
       level: apiQuestion?.level ?? null,
@@ -361,22 +375,24 @@ export default function QuizWidget() {
   }
 
   const handleAnswerSubmit = async (questionId: string | number, answer: string | string[]) => {
+    // ... existing handleAnswerSubmit ...
     const key = String(questionId)
     setUserAnswers((prev) => ({ ...prev, [key]: answer }))
 
     const q = questions[currentQuestionIndex]
     let evalResult: EvaluateAnswerResponse | null = null
 
-    if (user && q && (q.type === "open_ended" || q.type === "scenario")) {
+    if (user && q && (q.type === "open_ended" || q.type === "scenario" || q.type === "short_answer")) {
+      // ... existing eval logic ...
       try {
         const rawCorrect =
           typeof (q as any).correctAnswer === "string"
             ? (q as any).correctAnswer
             : Array.isArray((q as any).correctAnswer)
-            ? (q as any).correctAnswer.join(" ")
-            : typeof (q as any).answer === "string"
-            ? (q as any).answer
-            : ""
+              ? (q as any).correctAnswer.join(" ")
+              : typeof (q as any).answer === "string"
+                ? (q as any).answer
+                : ""
 
         const userText = Array.isArray(answer)
           ? answer.map((ans, idx) => `Step ${idx + 1}: ${ans}`).join("\n")
@@ -440,10 +456,10 @@ export default function QuizWidget() {
           typeof (q as any).correctAnswer === "string"
             ? (q as any).correctAnswer
             : Array.isArray((q as any).correctAnswer)
-            ? (q as any).correctAnswer.join(" ")
-            : typeof (q as any).answer === "string"
-            ? (q as any).answer
-            : ""
+              ? (q as any).correctAnswer.join(" ")
+              : typeof (q as any).answer === "string"
+                ? (q as any).answer
+                : ""
 
         if (!userAnswer) {
           detailedQuestions.push({
@@ -463,9 +479,22 @@ export default function QuizWidget() {
             String(userAnswer).toLowerCase().trim() ===
             String(rawCorrect).toLowerCase().trim()
         } else if (q.type === "short_answer") {
-          const norm = (s: string) => s.toLowerCase().trim().replace(/[.,!?;:]/g, "")
-          isCorrect = norm(String(userAnswer)) === norm(String(rawCorrect))
+          if (evalForQ) {
+            isCorrect = evalForQ.is_correct
+          } else {
+            const norm = (s: string) => s.toLowerCase().trim().replace(/[.,!?;:]/g, "")
+            const userNorm = norm(String(userAnswer))
+
+            // 🆕 Array support for short_answer
+            if (Array.isArray((q as any).correctAnswer)) {
+              const possibilities = (q as any).correctAnswer as string[]
+              isCorrect = possibilities.some(poss => norm(poss) === userNorm)
+            } else {
+              isCorrect = userNorm === norm(String(rawCorrect))
+            }
+          }
         } else {
+          // ... existing logic for open_ended ...
           if (evalForQ) {
             isCorrect = evalForQ.is_correct
           } else {
@@ -487,6 +516,7 @@ export default function QuizWidget() {
           is_correct: isCorrect,
           eval_score: evalForQ?.score,
           eval_feedback: evalForQ?.feedback,
+          rubric: evalForQ?.rubric,
         })
       }
 
@@ -612,7 +642,7 @@ export default function QuizWidget() {
                 </Badge>
                 {timer.isPaused && (
                   <Badge variant="outline" className="text-xs">
-                    {timer.pauseReason === "hidden" ? "Tab Hidden" : "Idle"}
+                    {timer.pauseReason === "hidden" ? "Sekme Gizli" : "Boşta"}
                   </Badge>
                 )}
               </div>
@@ -686,7 +716,7 @@ export default function QuizWidget() {
               <AlertCircle className="w-6 h-6 text-destructive flex-shrink-0 mt-0.5" />
               <div className="space-y-2 flex-1">
                 <h3 className="text-xl font-semibold text-destructive">
-                  Backend Connection Error
+                  Backend Bağlantı Hatası
                 </h3>
                 <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-mono bg-muted p-4 rounded-lg">
                   {error}
@@ -694,7 +724,7 @@ export default function QuizWidget() {
               </div>
             </div>
             <Button onClick={handleRestart} variant="outline" className="w-full bg-transparent">
-              Return to Home
+              Ana Sayfaya Dön
             </Button>
           </Card>
         )}

@@ -21,10 +21,16 @@ def _normalize_difficulty(value: str) -> DifficultyLevel:
     return DifficultyLevel(value)
 
 
+from app.domain.services.guardrails_service import guardrails
+
 def parse_llm_question_payload(payload: Dict[str, Any]) -> QuestionModel:
     """
     LLM'in ürettiği JSON payload'ını uygun QuestionModel objesine dönüştürür.
+    Otomatik PII temizliği yapar.
     """
+    # 🛡️ PII Masking
+    payload = guardrails.sanitize_payload(payload)
+
     qtype = QuestionType(payload["question_type"])
 
     base = dict(

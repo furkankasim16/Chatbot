@@ -138,21 +138,21 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
   // İlk yükleme
   useEffect(() => {
     let mounted = true
-    ;(async () => {
-      try {
-        setIsLoading(true)
-        const data = await getAllQuestions()
-        if (!mounted) return
-        setQuestions(data)
-        setError(null)
-      } catch (err: any) {
-        console.error(err)
-        if (!mounted) return
-        setError("Sorular yüklenirken bir hata oluştu.")
-      } finally {
-        if (mounted) setIsLoading(false)
-      }
-    })()
+      ; (async () => {
+        try {
+          setIsLoading(true)
+          const data = await getAllQuestions()
+          if (!mounted) return
+          setQuestions(data)
+          setError(null)
+        } catch (err: any) {
+          console.error(err)
+          if (!mounted) return
+          setError("Sorular yüklenirken bir hata oluştu.")
+        } finally {
+          if (mounted) setIsLoading(false)
+        }
+      })()
     return () => {
       mounted = false
     }
@@ -322,10 +322,10 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
     const scenarioText: string = q.scenario ?? ""
     const steps: UiScenarioStep[] = Array.isArray(q.steps)
       ? q.steps.map((s: any) => ({
-          ...s,
-          _clientId: s._clientId ?? nanoid(),
-          _action: undefined, // ilk açılışta değişmemiş kabul
-        }))
+        ...s,
+        _clientId: s._clientId ?? nanoid(),
+        _action: undefined, // ilk açılışta değişmemiş kabul
+      }))
       : []
 
     setEditForm({
@@ -351,7 +351,7 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
     const idStr = String(id)
 
     try {
-      await deleteQuestion(idStr, token)
+      await deleteQuestion(token, idStr)
 
       setQuestions((prev: any[]) =>
         prev.filter((q) => String(q.id) !== idStr),
@@ -1060,11 +1060,11 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
                                 setEditForm((prev) =>
                                   prev
                                     ? {
-                                        ...prev,
-                                        options: prev.options.map((o, i) =>
-                                          i === index ? e.target.value : o,
-                                        ),
-                                      }
+                                      ...prev,
+                                      options: prev.options.map((o, i) =>
+                                        i === index ? e.target.value : o,
+                                      ),
+                                    }
                                     : prev,
                                 )
                               }
@@ -1094,18 +1094,18 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
                                 setEditForm((prev) =>
                                   prev
                                     ? {
-                                        ...prev,
-                                        options: prev.options.filter(
-                                          (_, i) => i !== index,
-                                        ),
-                                        correct_index:
-                                          prev.correct_index === index
-                                            ? null
-                                            : prev.correct_index != null &&
-                                                prev.correct_index > index
-                                              ? prev.correct_index - 1
-                                              : prev.correct_index,
-                                      }
+                                      ...prev,
+                                      options: prev.options.filter(
+                                        (_, i) => i !== index,
+                                      ),
+                                      correct_index:
+                                        prev.correct_index === index
+                                          ? null
+                                          : prev.correct_index != null &&
+                                            prev.correct_index > index
+                                            ? prev.correct_index - 1
+                                            : prev.correct_index,
+                                    }
                                     : prev,
                                 )
                               }
@@ -1124,9 +1124,9 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
                             setEditForm((prev) =>
                               prev
                                 ? {
-                                    ...prev,
-                                    options: [...prev.options, ""],
-                                  }
+                                  ...prev,
+                                  options: [...prev.options, ""],
+                                }
                                 : prev,
                             )
                           }
@@ -1172,12 +1172,12 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
                                 setEditForm((prev) =>
                                   prev
                                     ? {
-                                        ...prev,
-                                        accepted_answers:
-                                          prev.accepted_answers.map((a, i) =>
-                                            i === index ? e.target.value : a,
-                                          ),
-                                      }
+                                      ...prev,
+                                      accepted_answers:
+                                        prev.accepted_answers.map((a, i) =>
+                                          i === index ? e.target.value : a,
+                                        ),
+                                    }
                                     : prev,
                                 )
                               }
@@ -1193,12 +1193,12 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
                                 setEditForm((prev) =>
                                   prev
                                     ? {
-                                        ...prev,
-                                        accepted_answers:
-                                          prev.accepted_answers.filter(
-                                            (_, i) => i !== index,
-                                          ),
-                                      }
+                                      ...prev,
+                                      accepted_answers:
+                                        prev.accepted_answers.filter(
+                                          (_, i) => i !== index,
+                                        ),
+                                    }
                                     : prev,
                                 )
                               }
@@ -1217,12 +1217,12 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
                             setEditForm((prev) =>
                               prev
                                 ? {
-                                    ...prev,
-                                    accepted_answers: [
-                                      ...prev.accepted_answers,
-                                      "",
-                                    ],
-                                  }
+                                  ...prev,
+                                  accepted_answers: [
+                                    ...prev.accepted_answers,
+                                    "",
+                                  ],
+                                }
                                 : prev,
                             )
                           }
@@ -1408,7 +1408,7 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
                     {/* TRUE / FALSE Detayları */}
                     {(selectedQuestion as any).question_type === "true_false" &&
                       typeof (selectedQuestion as any).correct_answer ===
-                        "boolean" && (
+                      "boolean" && (
                         <div className="space-y-1 mt-2 border-t pt-2">
                           <p className="text-[11px] text-muted-foreground font-semibold">
                             Doğru / Yanlış Cevabı
@@ -1431,7 +1431,7 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
                           Kabul Edilen Cevaplar
                         </p>
                         {Array.isArray((selectedQuestion as any).accepted_answers) &&
-                        (selectedQuestion as any).accepted_answers.length > 0 ? (
+                          (selectedQuestion as any).accepted_answers.length > 0 ? (
                           <ul className="list-disc list-inside space-y-1 text-xs">
                             {(selectedQuestion as any).accepted_answers.map(
                               (ans: string, idx: number) => (
@@ -1488,7 +1488,7 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
 
                           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                             {Array.isArray((selectedQuestion as any).steps) &&
-                            (selectedQuestion as any).steps.length > 0 ? (
+                              (selectedQuestion as any).steps.length > 0 ? (
                               (selectedQuestion as any).steps.map(
                                 (step: any, idx: number) => {
                                   const rawType = String(step.step_type ?? "").toLowerCase()
@@ -1553,15 +1553,15 @@ export function AdminQuestionBank({ token }: QuestionBankProps) {
                                       {/* True/False cevap */}
                                       {typeof step.correct_answer_bool ===
                                         "boolean" && (
-                                        <p className="mt-1 text-[11px]">
-                                          Doğru cevap:{" "}
-                                          <span className="font-semibold">
-                                            {step.correct_answer_bool
-                                              ? "Doğru"
-                                              : "Yanlış"}
-                                          </span>
-                                        </p>
-                                      )}
+                                          <p className="mt-1 text-[11px]">
+                                            Doğru cevap:{" "}
+                                            <span className="font-semibold">
+                                              {step.correct_answer_bool
+                                                ? "Doğru"
+                                                : "Yanlış"}
+                                            </span>
+                                          </p>
+                                        )}
 
                                       {/* Short answer kabul edilen cevaplar */}
                                       {Array.isArray(step.accepted_answers) &&
@@ -1793,7 +1793,7 @@ function ScenarioStepRow({
       base.options = step.options?.length ? step.options : ["", "", "", ""]
       base.correct_option_indexes =
         step.correct_option_indexes?.length &&
-        Array.isArray(step.correct_option_indexes)
+          Array.isArray(step.correct_option_indexes)
           ? step.correct_option_indexes
           : [0]
       base.correct_answer_bool = undefined

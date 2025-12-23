@@ -9,6 +9,7 @@ class ChatMode(str, Enum):
     TUTOR = "tutor"          # öğretici mod
     PLAYGROUND = "playground"  # serbest sohbet / deneme
     REVIEW = "review"        # quiz / cevap analizi
+    LOADTEST = "loadtest"    # yük testi (mock)
 
 
 class ChatMessageRole(str, Enum):
@@ -36,6 +37,7 @@ class ChatTurnRequest(BaseModel):
     topic: Optional[str] = None
     level: Optional[str] = None
     language: Optional[str] = "tr"
+    use_rag: bool = False
 
     # İstersen UI'den de geçmiş mesajları gönderebilirsin
     history: Optional[List[ChatMessage]] = None
@@ -63,3 +65,10 @@ class ChatTurnResponse(BaseModel):
     # Hata olduğunda doldurulabilir
     error: Optional[str] = None
     session_id: Optional[str] = None  
+
+class ChatJobResponse(BaseModel):
+    job_id: str
+    status: Literal["queued", "completed", "failed", "started", "deferred", "scheduled", "not_found", "expired"]
+    result: Optional[ChatTurnResponse] = None
+    waited_ms: Optional[int] = None
+    error: Optional[str] = None

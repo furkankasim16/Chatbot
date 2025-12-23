@@ -1,0 +1,65 @@
+
+version: '3.8'
+
+services:
+  # 🧠 Backend (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: quiz_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      # Persist SQLite DB
+      - ./app/data:/app/app/data
+    environment:
+      - CHROMA_DB_URL=http://chromadb:8000
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    depends_on:
+      - chromadb
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Access host Ollama
+    networks:
+      - quiz_network
+
+  # 🎨 Frontend (Next.js)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Client side needs to know where to call logic. 
+        # In browser, localhost:8000 (from host) is fine for server components it might need internal dns
+        # But for this simple app, we mostly fetch from client.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: quiz_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - quiz_network
+
+  # 💾 Vector Database (ChromaDB)
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: quiz_chromadb
+    ports:
+      - "8008:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+    networks:
+      - quiz_network
+
+volumes:
+  chroma_data:
+
+networks:
+  quiz_network:
+    driver: bridge

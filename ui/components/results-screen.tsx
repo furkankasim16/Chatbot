@@ -22,6 +22,12 @@ interface QuestionResultDetail {
   is_correct: boolean
   eval_score?: number
   eval_feedback?: string
+  rubric?: Array<{
+    criteria: string
+    score: number
+    max_score: number
+    feedback: string
+  }>
 }
 
 interface ResultsScreenProps {
@@ -73,10 +79,10 @@ function levenshteinDistance(str1: string, str2: string): number {
         str2[i - 1] === str1[j - 1]
           ? matrix[i - 1][j - 1]
           : Math.min(
-              matrix[i - 1][j - 1] + 1,
-              matrix[i][j - 1] + 1,
-              matrix[i - 1][j] + 1,
-            )
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1,
+          )
     }
   }
   return matrix[str2.length][str1.length]
@@ -88,16 +94,16 @@ export function ResultsScreen({
   onRestart,
   detailedResults,
 }: ResultsScreenProps) {
-  
+
   const getDetail = (qid: string) =>
     detailedResults?.find((d) => d.question_id === qid)
 
   const autoGraded = questions.filter(
-    (q) => q.type === "mcq" || q.type === "true_false" || q.type === "short_answer"
+    (q) => q.type === "mcq" || q.type === "true_false"
   )
 
   const manualReview = questions.filter(
-    (q) => q.type === "open_ended" || q.type === "scenario"
+    (q) => q.type === "open_ended" || q.type === "scenario" || q.type === "short_answer"
   )
 
   const correctCount = autoGraded.reduce((acc, q) => {
@@ -112,8 +118,8 @@ export function ResultsScreen({
       typeof q.correctAnswer === "string"
         ? q.correctAnswer
         : Array.isArray(q.correctAnswer)
-        ? q.correctAnswer[0]
-        : q.answer ?? ""
+          ? q.correctAnswer[0]
+          : q.answer ?? ""
 
     if (!rawCorrect) return acc
 
@@ -137,11 +143,11 @@ export function ResultsScreen({
     : 0
 
   const status =
-    percentage >= 80 ? "Excellent" : percentage >= 60 ? "Good" : "Keep Practicing"
+    percentage >= 80 ? "Mükemmel" : percentage >= 60 ? "İyi" : "Pratik Yapmaya Devam Et";
 
   return (
     <div className="animate-fade-in space-y-6">
-      
+
       {/* ---------------- Summary Card ---------------- */}
       <Card className="p-8 space-y-6 text-center">
         <div className="flex justify-center">
@@ -150,54 +156,96 @@ export function ResultsScreen({
           </div>
         </div>
 
-        <h2 className="text-3xl font-bold">Quiz Complete!</h2>
-        <p className="text-muted-foreground text-lg">Here's how you performed</p>
+        <h2 className="text-3xl font-bold">Quiz Tamamlandı!</h2>
+        <p className="text-muted-foreground text-lg">İşte performansın</p>
 
-        <div className="text-6xl font-bold text-primary">{percentage}%</div>
+        <div className="text-6xl font-bold text-primary">%{percentage}</div>
         <p className="text-xl font-semibold">{status}</p>
-        <p className="text-muted-foreground">{correctCount} / {autoGraded.length} correct</p>
+        <p className="text-muted-foreground">{correctCount} / {autoGraded.length} doğru</p>
+      </Card>
 
-        {/* ---------------- AI Evaluation Section ---------------- */}
-        {manualReview.length > 0 && detailedResults && (
-          <Card className="p-6 space-y-4 border-primary/30 bg-primary/5 mt-6">
-            <h3 className="text-lg font-semibold flex items-center gap-2 text-primary">
-              <Sparkles className="w-5 h-5" />
-              AI Evaluation Summary
-            </h3>
+      {/* ---------------- AI Evaluation Section ---------------- */}
+      {manualReview.length > 0 && detailedResults && (
+        <Card className="p-6 space-y-4 border-primary/30 bg-primary/5 mt-6">
+          <h3 className="text-lg font-semibold flex items-center gap-2 text-primary">
+            <Sparkles className="w-5 h-5" />
+            Yapay Zeka Değerlendirmesi
+          </h3>
 
-            {detailedResults
-              .filter((d) => manualReview.some((q) => String(q.id) === d.question_id))
-              .map((res) => (
+          {detailedResults
+            .filter((d) => manualReview.some((q) => String(q.id) === d.question_id))
+            .map((res) => {
+              const detail = res;
+              return (
                 <div key={res.question_id} className="p-4 bg-card border rounded-lg space-y-2">
                   <p className="font-medium">{res.stem}</p>
 
                   <div className="flex items-center gap-2 text-sm">
-                    <Badge variant={res.is_correct ? "default" : "destructive"}>
-                      {res.is_correct ? "AI Marked Correct" : "Needs Improvement"}
+                    <Badge className={res.is_correct ? "bg-emerald-500 hover:bg-emerald-600" : "bg-rose-500 hover:bg-rose-600"}>
+                      {res.is_correct ? "YZ: Doğru" : "Geliştirilmeli"}
                     </Badge>
 
                     {res.eval_score !== undefined && (
-                      <Badge variant="outline">Score: {res.eval_score}/5</Badge>
+                      <Badge variant="outline">Puan: {res.eval_score}/5</Badge>
                     )}
                   </div>
 
-                  {res.eval_feedback && (
-                    <p className="text-xs text-muted-foreground border-l pl-3 italic">
-                      {res.eval_feedback}
-                    </p>
+                  {/* Rubric Table Display */}
+                  {detail.rubric && detail.rubric.length > 0 && (
+                    <div className="mt-4 border rounded-md overflow-hidden">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-muted text-muted-foreground uppercase text-xs">
+                          <tr>
+                            <th className="px-4 py-2">Kriter</th>
+                            <th className="px-4 py-2">Puan</th>
+                            <th className="px-4 py-2">Geri Bildirim</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {detail.rubric.map((r, idx) => (
+                            <tr key={idx} className="bg-card">
+                              <td className="px-4 py-2 font-medium">{r.criteria}</td>
+                              <td className="px-4 py-2 w-24">
+                                <span className={r.score === r.max_score ? "text-emerald-600" : "text-amber-600"}>
+                                  {r.score}
+                                </span>
+                                <span className="text-muted-foreground"> / {r.max_score}</span>
+                              </td>
+                              <td className="px-4 py-2 text-muted-foreground">{r.feedback}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
-                </div>
-              ))}
-          </Card>
-        )}
 
-        <Button onClick={onRestart} className="w-full mt-6">Start New Quiz</Button>
-      </Card>
+                  {/* Old Feedback Display (Fallback) */}
+                  {!detail.rubric && detail.eval_feedback && (
+                    <div className="mt-3 bg-blue-50 dark:bg-blue-950/20 p-3 rounded text-sm text-blue-700 dark:text-blue-300">
+                      <span className="font-semibold">Geri Bildirim: </span>
+                      {detail.eval_feedback}
+                    </div>
+                  )}
+
+                  {/* Source Context Display */}
+                  {/* The original eval_feedback display was here, now replaced/moved */}
+                  {/* {res.eval_feedback && (
+                      <p className="text-xs text-muted-foreground border-l pl-3 italic">
+                        {res.eval_feedback}
+                      </p>
+                    )} */}
+                </div>
+              )
+            })}
+
+          <Button onClick={onRestart} className="w-full mt-6">Yeni Quiz Başlat</Button>
+        </Card>
+      )}
 
       {/* ---------------- Answer Review (Auto-Graded) ---------------- */}
       {autoGraded.length > 0 && (
         <Card className="p-6 space-y-4">
-          <h3 className="text-lg font-semibold">Answer Review</h3>
+          <h3 className="text-lg font-semibold">Cevap İncelemesi</h3>
 
           {autoGraded.map((q) => {
             const key = String(q.id)
@@ -208,8 +256,8 @@ export function ResultsScreen({
               typeof q.correctAnswer === "string"
                 ? q.correctAnswer
                 : Array.isArray(q.correctAnswer)
-                ? q.correctAnswer[0]
-                : q.answer ?? ""
+                  ? q.correctAnswer[0]
+                  : q.answer ?? ""
 
             const isCorrect = detail?.is_correct ?? (
               userAnswer &&
@@ -219,27 +267,33 @@ export function ResultsScreen({
             return (
               <div key={key} className="p-4 rounded-lg border flex gap-3">
                 {isCorrect ? (
-                  <CheckCircle2 className="w-5 h-5 text-accent" />
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                 ) : (
-                  <XCircle className="w-5 h-5 text-destructive" />
+                  <XCircle className="w-5 h-5 text-rose-500" />
                 )}
 
                 <div className="flex-1">
                   <p className="font-medium">{q.stem}</p>
                   <p className="text-xs text-muted-foreground">
-                    Your answer: {String(userAnswer ?? "No answer")}
+                    Cevabın: {String(userAnswer ?? "Cevap yok")}
                   </p>
                   {!isCorrect && (
                     <p className="text-xs text-muted-foreground">
-                      Correct: <span className="text-accent">{String(rawCorrect)}</span>
+                      Doğru Cevap: <span className="text-accent">{String(rawCorrect)}</span>
                     </p>
+                  )}
+                  {q.source_context && (
+                    <div className="mt-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded border-l-2 border-primary/20">
+                      <span className="font-semibold text-primary/80">Kaynak Bağlamı:</span> {q.source_context}
+                    </div>
                   )}
                 </div>
               </div>
             )
           })}
         </Card>
-      )}
-    </div>
+      )
+      }
+    </div >
   )
 }

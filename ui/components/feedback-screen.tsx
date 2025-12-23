@@ -46,34 +46,33 @@ export function FeedbackScreen({
   const isCorrect =
     question.type === "mcq" || question.type === "true_false"
       ? String(userAnswer ?? "").toLowerCase().trim() ===
-        String(rawCorrect).toLowerCase().trim()
+      String(rawCorrect).toLowerCase().trim()
       : evaluation?.is_correct ?? false
 
   const title =
     question.type === "mcq" || question.type === "true_false"
       ? isCorrect
-        ? "Correct!"
-        : "Not Quite"
+        ? "Doğru!"
+        : "Yanlış"
       : evaluation?.is_correct
-      ? "Great job!"
-      : "AI Feedback"
+        ? "Harika iş!"
+        : "YZ Geri Bildirimi"
 
   return (
     <div className="animate-fade-in space-y-6">
       <Card
-        className={`p-8 space-y-6 border-2 ${
-          isCorrect ? "border-accent" : "border-destructive"
-        }`}
+        className={`p-8 space-y-6 border-2 ${isCorrect ? "border-emerald-500/50" : "border-rose-500/50"
+          }`}
       >
         {/* Üst başlık */}
         <div className="flex items-start gap-4">
           {isCorrect ? (
-            <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
-              <CheckCircle2 className="w-6 h-6 text-accent" />
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
             </div>
           ) : (
-            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
-              <XCircle className="w-6 h-6 text-destructive" />
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center flex-shrink-0">
+              <XCircle className="w-6 h-6 text-rose-500" />
             </div>
           )}
 
@@ -84,9 +83,9 @@ export function FeedbackScreen({
             <p className="text-muted-foreground leading-relaxed">
               {question.type === "mcq" || question.type === "true_false"
                 ? isCorrect
-                  ? "Great job! You got it right."
-                  : "Don't worry, let's learn from this."
-                : "See how the AI evaluated your response."}
+                  ? "Harika! Doğru cevapladın."
+                  : "Üzülme, bundan ders çıkaralım."
+                : "Yapay zekanın cevabını nasıl değerlendirdiğini gör."}
             </p>
           </div>
         </div>
@@ -94,17 +93,17 @@ export function FeedbackScreen({
         {/* Kullanıcının cevabı */}
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-card-foreground uppercase tracking-wide">
-            Your Answer
+            Cevabın
           </h4>
           <div className="p-4 rounded-lg bg-muted/50 border border-border text-sm text-card-foreground leading-relaxed">
             {isArray
               ? (userAnswer as string[]).map((ans, i) => (
-                  <div key={i} className="mb-2 last:mb-0">
-                    <span className="font-medium">Step {i + 1}:</span>{" "}
-                    {ans}
-                  </div>
-                ))
-              : userAnswer || "No answer provided"}
+                <div key={i} className="mb-2 last:mb-0">
+                  <span className="font-medium">Adım {i + 1}:</span>{" "}
+                  {ans}
+                </div>
+              ))
+              : userAnswer || "Cevap verilmedi"}
           </div>
         </div>
 
@@ -115,7 +114,7 @@ export function FeedbackScreen({
             question.type === "short_answer") && (
             <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-2">
               <p className="text-sm font-medium text-muted-foreground">
-                Correct Answer
+                Doğru Cevap
               </p>
               <p className="text-base text-card-foreground font-medium">
                 {String(rawCorrect)}
@@ -126,11 +125,11 @@ export function FeedbackScreen({
         {/* Açıklama (rationale) */}
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-card-foreground uppercase tracking-wide">
-            Explanation
+            Açıklama
           </h4>
           <p className="text-base text-muted-foreground leading-relaxed">
             {question.rationale ||
-              "No explanation provided for this question."}
+              "Bu soru için açıklama bulunmuyor."}
           </p>
         </div>
 
@@ -143,12 +142,12 @@ export function FeedbackScreen({
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
                   <p className="text-xs font-semibold text-primary">
-                    AI Evaluation
+                    YZ Değerlendirmesi
                   </p>
                 </div>
                 {typeof evaluation.score === "number" && (
                   <Badge variant="outline" className="text-xs">
-                    Score: {evaluation.score}/5
+                    Puan: {evaluation.score}/5
                   </Badge>
                 )}
               </div>
@@ -172,7 +171,7 @@ export function FeedbackScreen({
           className="w-full h-12 text-base font-medium"
           size="lg"
         >
-          {isLastQuestion ? "View Results" : "Next Question"}
+          {isLastQuestion ? "Sonuçları Gör" : "Sonraki Soru"}
         </Button>
       </Card>
     </div>
@@ -185,25 +184,25 @@ function SourceCard({ source }: { source?: SourceInfo | string | null }) {
   return (
     <div className="space-y-3">
       <h4 className="text-sm font-semibold text-card-foreground uppercase tracking-wide">
-        Source Reference
+        Kaynak Referans
       </h4>
       <div className="p-4 rounded-lg bg-card border border-border hover:shadow-md transition-shadow">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <p className="font-medium text-card-foreground">
-                {source.documentName || "Unknown source"}
+                {source.documentName || "Bilinmeyen kaynak"}
               </p>
               {(typeof source.page === "number" || source.passageId) && (
                 <p className="text-sm text-muted-foreground">
                   {typeof source.page === "number"
-                    ? `Page ${source.page}`
+                    ? `Sayfa ${source.page}`
                     : ""}
                   {typeof source.page === "number" && source.passageId
                     ? " • "
                     : ""}
                   {source.passageId
-                    ? `Passage ${source.passageId}`
+                    ? `Pasaj ${source.passageId}`
                     : ""}
                 </p>
               )}
@@ -217,7 +216,7 @@ function SourceCard({ source }: { source?: SourceInfo | string | null }) {
             <p className="text-sm text-muted-foreground italic leading-relaxed">
               {source.snippet
                 ? `"${source.snippet}"`
-                : "No snippet available for this question."}
+                : "Bu soru için alıntı bulunmuyor."}
             </p>
           </div>
         </div>

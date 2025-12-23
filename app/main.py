@@ -1,13 +1,13 @@
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
+
+from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.init_db import init_app_db, init_questions_db
 from app.core.db import _open_sqlite
 from app.core.paths import DB_DIR
-
-app = FastAPI(title="API", openapi_url="/api/v1/openapi.json")
-
+from app.domain.services.llm_service import OllamaOverloadedError
 from app.api.routers.health import router as health_router
 from app.api.routers.questions import router as questions_router
 from app.api.routers.chat import router as chat_router
@@ -15,8 +15,34 @@ from app.api.routers.auth import router as auth_router
 from app.api.routers.quiz import router as quiz_router
 from app.api.routers.admin import router as admin_router
 from app.api.routers.admin_quiz import router as admin_quiz_router
+from app.api.routers.knowledge_base import router as kb_router
+from app.api.routers.rag import router as rag_router
+from app.core.logging import setup_logging
+from app.core.middleware import RequestLoggingMiddleware
+import logging
 
-# main.py (middleware kısmı)
+# Setup Logging
+setup_logging()
+logger = logging.getLogger("app.main")
+
+app = FastAPI(title="API", openapi_url="/api/v1/openapi.json")
+
+# Add Logging Middleware
+app.add_middleware(RequestLoggingMiddleware)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Unhandled Exception: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error. Please contact support."}
+    )
+
+@app.exception_handler(OllamaOverloadedError)
+async def ollama_overloaded_handler(request: Request, exc: OllamaOverloadedError):
+    return JSONResponse(status_code=429, content={"detail": str(exc)})
+
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[                     # ✅ DEV: açık liste
@@ -40,6 +66,8 @@ api_v1.include_router(auth_router)       # bu dosyalarda kendi prefix’i var
 api_v1.include_router(quiz_router, tags=["quiz"])
 api_v1.include_router(admin_router, tags=["admin"])
 api_v1.include_router(admin_quiz_router)
+api_v1.include_router(kb_router)
+api_v1.include_router(rag_router)
 app.include_router(api_v1)
 
 def _bump_once(db_path, init_fn, target_version: int = 1):
@@ -55,9 +83,10 @@ def _bump_once(db_path, init_fn, target_version: int = 1):
 
 @app.on_event("startup")
 def startup_init_all():
-    print(f"[DB] dir     : {DB_DIR}")
-    print(f"[DB] app     : {settings.APP_DB_PATH}")
-    print(f"[DB] questions: {settings.QUESTIONS_DB_PATH}")
+    logger.info("Starting up application...")
+    logger.info(f"[DB] dir     : {DB_DIR}")
+    logger.info(f"[DB] app     : {settings.APP_DB_PATH}")
+    logger.info(f"[DB] questions: {settings.QUESTIONS_DB_PATH}")
     _bump_once(settings.QUESTIONS_DB_PATH, init_questions_db, 1)
     _bump_once(settings.APP_DB_PATH, init_app_db, 1)
 

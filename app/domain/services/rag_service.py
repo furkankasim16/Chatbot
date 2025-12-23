@@ -1,57 +1,210 @@
-import os, re
+import os
+import random
+import logging
+from typing import List, Optional
+import pypdf
 import chromadb
-from chromadb.utils import embedding_functions
-from typing import List, Tuple
-from pathlib import Path
+from chromadb.config import Settings as ChromaSettings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from sentence_transformers import SentenceTransformer
+
 from app.core.config import settings
 
-def _client():
-    return chromadb.PersistentClient(path=settings.CHROMA_PERSIST_DIR)
+logger = logging.getLogger("app.rag_service")
 
-def _collection(name: str = "default"):
-    ef = embedding_functions.DefaultEmbeddingFunction()
-    return _client().get_or_create_collection(name=name, embedding_function=ef)
+# Global instances (lazy loaded)
+_chroma_client = None
+_embed_model = None
 
-def search(query: str, top_k: int = 3, collection: str = "default") -> List[Tuple[str, float]]:
-    col = _collection(collection)
-    res = col.query(query_texts=[query], n_results=top_k)
-    docs = res.get("documents", [[]])[0]
-    dists = res.get("distances", [[]])[0]
-    return list(zip(docs, dists))
+def get_chroma_client():
+    global _chroma_client
+    if _chroma_client is None:
+        # Ensure persistence directory exists
+        persist_dir = settings.CHROMA_PERSIST_DIR
+        os.makedirs(persist_dir, exist_ok=True)
+        
+        _chroma_client = chromadb.PersistentClient(path=persist_dir)
+    return _chroma_client
 
-# ---- Indexing ----
-def index_texts(texts: List[str], ids: List[str], collection: str = "default"):
-    col = _collection(collection)
-    col.add(documents=texts, ids=ids)
+def get_embed_model():
+    global _embed_model
+    if _embed_model is None:
+        model_name = settings.EMBED_MODEL or "intfloat/multilingual-e5-large"
+        logger.info(f"Loading embedding model: {model_name}")
+        _embed_model = SentenceTransformer(model_name)
+    return _embed_model
 
-def clear_collection(collection: str = "default"):
-    col = _collection(collection)
-    col.delete(where={})  # all
+class RAGService:
+    def __init__(self):
+        self.chunk_size = 1000
+        self.chunk_overlap = 200
+        self.splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            separators=["\n\n", "\n", ". ", " ", ""]
+        )
 
-# Basit metin çıkarımı (pdf/docx/pptx/xlsx -> düz metin)
-def extract_text_from_path(path: str) -> str:
-    p = Path(path)
-    low = p.suffix.lower()
-    if low in {".txt", ".md"}:
-        return p.read_text(encoding="utf-8", errors="ignore")
-    # Minimal, dış bağımlılıksız: ikili dosyaları ham olarak okuyup ascii çıkaralım
-    raw = p.read_bytes()
-    text = raw.decode("utf-8", errors="ignore")
-    text = re.sub(r"\s+", " ", text)
-    return text
-
-def index_folder(folder: str, collection: str = "default") -> int:
-    p = Path(folder)
-    files = [fp for fp in p.rglob("*") if fp.is_file()]
-    docs, ids = [], []
-    for f in files:
+    def _extract_text_from_pdf(self, pdf_bytes: bytes) -> str:
+        """PDF bytes -> Full text"""
+        import io
         try:
-            t = extract_text_from_path(str(f))
-            if t.strip():
-                docs.append(t[:20000])   # güvenlik: çok uzunları kıs
-                ids.append(str(f))
+            reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+            text = []
+            for page in reader.pages:
+                t = page.extract_text()
+                if t:
+                    text.append(t)
+            return "\n".join(text)
+        except Exception as e:
+            logger.error(f"PDF extraction error: {e}")
+            raise ValueError("PDF content could not be read.")
+
+    def index_pdf(self, pdf_bytes: bytes, collection_name: str, filename: str = "pdf") -> int:
+        """
+        Extracts text, chunks it, embeds it, and stores it in ChromaDB.
+        Returns the number of chunks indexed.
+        """
+        text = self._extract_text_from_pdf(pdf_bytes)
+        if not text.strip():
+            return 0
+            
+        chunks = self.splitter.split_text(text)
+        if not chunks:
+            return 0
+            
+        # Get embeddings
+        model = get_embed_model()
+        embeddings = model.encode(chunks) # List of vectors
+        
+        # Get/Create collection
+        client = get_chroma_client()
+        collection = client.get_or_create_collection(name=collection_name)
+        
+        # Prepare data for Chroma
+        # ⚠️ CRITICAL: IDs must be unique across files. Using filename prefix.
+        safe_name = filename.replace(" ", "_").replace("/", "_")
+        ids = [f"{safe_name}_chunk_{i}" for i in range(len(chunks))]
+        metadatas = [{"source": filename, "chunk_index": i} for i in range(len(chunks))]
+        
+        # Add to collection
+        collection.add(
+            documents=chunks,
+            embeddings=embeddings.tolist(),
+            metadatas=metadatas,
+            ids=ids
+        )
+        
+        logger.info(f"Indexed {len(chunks)} chunks from {filename} into '{collection_name}'")
+        return len(chunks)
+
+    def retrieve_context(self, query: str, collection_name: str, n_results: int = 3) -> str:
+        """
+        Semantically searches the collection for the query.
+        Returns joined chunk texts.
+        """
+        client = get_chroma_client()
+        try:
+            collection = client.get_collection(name=collection_name)
         except Exception:
-            continue
-    if docs:
-        index_texts(docs, ids, collection=collection)
-    return len(docs)
+            # Collection might not exist
+            return ""
+            
+        model = get_embed_model()
+        query_vec = model.encode([query]).tolist()
+        
+        results = collection.query(
+            query_embeddings=query_vec,
+            n_results=n_results
+        )
+        
+        # results['documents'] is a list of list of strings
+        docs = results.get("documents", [])
+        if not docs or not docs[0]:
+            return ""
+            
+        return "\n\n".join(docs[0])
+
+    def get_random_context(self, collection_name: str, n_results: int = 1) -> str:
+        """
+        Returns random text chunks from the collection.
+        Useful when we want 'quiz from this book' without a specific topic.
+        """
+        client = get_chroma_client()
+        try:
+            collection = client.get_collection(name=collection_name)
+        except Exception:
+            return ""
+            
+        # Chroma doesn't support 'random' natively easily without getting all IDs.
+        # Efficient hack: Get first N items or known IDs if we generated them sequentially.
+        # But we want true random. 
+        # Let's just peek a large number and sample python side if dataset is small, 
+        # or just query with a random vector? Querying with random vector is fun and effective enough.
+        
+        model = get_embed_model()
+        # Create a random vector of correct dimension. 
+        # E5-large dim is 1024. But let's verify dimension from model.
+        dim = model.get_sentence_embedding_dimension()
+        import numpy as np
+        rand_vec = np.random.rand(dim).tolist()
+        
+        results = collection.query(
+            query_embeddings=[rand_vec],
+            n_results=n_results
+        )
+        
+        docs = results.get("documents", [])
+        if not docs or not docs[0]:
+            return ""
+            
+        return "\n\n".join(docs[0])
+
+rag_service = RAGService()
+
+
+# --- Compatibility Wrappers (for legacy evaluate_service.py & chat.py) ---
+
+def search(query: str, top_k: int = 3) -> List[tuple]:
+    """
+    Legacy search support for evaluate_service.chat_with_context.
+    Uses 'default' collection.
+    Returns list of (document_text, score). Score is mocked as 0.0 since Chroma query doesn't easily return it here.
+    """
+    # Assuming 'default' collection for global chat context
+    res = rag_service.retrieve_context(query, collection_name="default", n_results=top_k)
+    if not res:
+        return []
+    # retrieve_context returns joined string. We'll just return it as one big chunk.
+    return [(res, 0.9)]
+
+
+def index_folder(folder_path: str, collection: str = "default") -> int:
+    """
+    Legacy folder indexing. Scans folder for PDFs and indexes them.
+    """
+    if not os.path.exists(folder_path):
+        return 0
+    
+    count = 0
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            if file.lower().endswith(".pdf"):
+                path = os.path.join(root, file)
+                try:
+                    with open(path, "rb") as f:
+                        rag_service.index_pdf(f.read(), collection_name=collection)
+                    count += 1
+                except Exception as e:
+                    logger.error(f"Failed to index {path}: {e}")
+    return count
+
+
+def clear_collection(collection_name: str = "default"):
+    """
+    Deletes a collection.
+    """
+    client = get_chroma_client()
+    try:
+        client.delete_collection(name=collection_name)
+    except Exception:
+        pass

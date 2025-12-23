@@ -51,6 +51,59 @@ Strict rules:
 Now generate the JSON.
 """.strip()
 
+def build_rubric_evaluation_prompt(
+    question: str,
+    expected_answer: str,
+    user_answer: str,
+) -> str:
+    return f"""
+Sen uzman bir sınav değerlendiricisisin.
+Aşağıdaki soruya verilen öğrenci cevabını değerlendireceksin.
+
+SORU:
+"{question}"
+
+BEKLENEN CEVAP (Referans):
+"{expected_answer}"
+
+ÖĞRENCİ CEVABI:
+"{user_answer}"
+
+Görevin:
+Öğrenci cevabını aşağıdaki kriterlere göre puanla ve detaylı geri bildirim ver.
+Puanlama 100 üzerinden yapılmalı.
+Geçme notu: 70
+
+Çıktı Formatı (SADECE JSON):
+{{
+  "score": 85,
+  "is_correct": true,
+  "feedback": "Genel değerlendirme yazısı...",
+  "rubric": [
+    {{
+      "criteria": "Doğruluk",
+      "score": 40,
+      "max_score": 50,
+      "feedback": "Kavramlar doğru ancak X eksik."
+    }},
+    {{
+      "criteria": "Tamlık",
+      "score": 30,
+      "max_score": 30,
+      "feedback": "Tüm istenenler belirtilmiş."
+    }},
+    {{
+      "criteria": "Terminoloji",
+      "score": 15,
+      "max_score": 20,
+      "feedback": "Y terimi yerine Z kullanılmalıydı."
+    }}
+  ]
+}}
+
+Lütfen Türkçe yanıt ver. JSON dışında hiçbir şey yazma.
+""".strip()
+
 def build_groq_mcq_prompt(topic: str, level: str) -> str:
     return f"""
 You are a question generator.

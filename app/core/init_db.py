@@ -10,6 +10,7 @@ def init_questions_db():
           stem TEXT, choices TEXT,
           answer_index INTEGER, rationale TEXT,
           source_model TEXT,
+          source_context TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""")
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_questions_hash ON questions(hash)")

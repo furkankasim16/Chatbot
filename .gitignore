@@ -5,3 +5,24 @@ __pycache__/
 .pytest_cache/
 .coverage
 dist/
+
+# Logs & Stats
+*.log
+verify_output_*.txt
+
+# Databases
+*.db
+*.sqlite3
+*.sqlite
+chroma_persistence/
+
+# OS & Tools
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Frontend
+node_modules/
+ui/node_modules/
+ui/.next/

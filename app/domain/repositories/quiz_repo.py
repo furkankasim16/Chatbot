@@ -1,5 +1,6 @@
 from typing import Dict, Any, List
-from app.core.db import app_cursor
+from app.core.db import app_cursor,questions_cursor
+from app.domain.schemas.quiz import RecentAttemptOut
 
 def create_attempt(data: Dict[str, Any]) -> int:
     with app_cursor() as c:
@@ -88,4 +89,96 @@ def user_activity(limit: int = 100) -> List[dict]:
             "total_duration_ms": r["total_duration_ms"],# ⭐ FRONTEND BURAYI KULLANACAK
             "questions_attempted": r["questions_attempted"],
         })
+    return out
+
+def usage_stats_by_topic(user_id: int) -> List[Dict[str, Any]]:
+    """
+    Kullanıcının konu bazlı performansını hesaplar.
+    """
+    sql = """
+    SELECT
+        topic,
+        COUNT(*) as total_quizzes,
+        SUM(total_questions) as total_questions,
+        SUM(correct_answers) as total_correct,
+        AVG(score) as avg_score
+    FROM quiz_attempts
+    WHERE user_id = ? AND score IS NOT NULL
+    GROUP BY topic
+    ORDER BY avg_score DESC
+    """
+    
+    with app_cursor() as c:
+        c.execute(sql, (user_id,))
+        rows = c.fetchall()
+        
+    out = []
+    for r in rows:
+        # SQLite row handling
+        t = r["topic"] if isinstance(r, dict) else r[0]
+        t_quizzes = r["total_quizzes"] if isinstance(r, dict) else r[1]
+        t_questions = r["total_questions"] if isinstance(r, dict) else r[2]
+        t_correct = r["total_correct"] if isinstance(r, dict) else r[3]
+        avg = r["avg_score"] if isinstance(r, dict) else r[4]
+        
+        out.append({
+            "topic": t,
+            "total_quizzes": t_quizzes,
+            "total_questions": t_questions,
+            "total_correct": t_correct,
+            "avg_score": round(avg, 1) if avg else 0
+        })
+    return out
+def get_recent_attempts(limit: int = 5) -> List[Dict[str, Any]]:
+    limit = max(1, min(int(limit or 5), 50))
+
+    sql = """
+    SELECT
+      id,
+      user_id,
+      quiz_date,
+      topic,
+      difficulty,
+      total_questions,
+      correct_answers,
+      score,
+      total_duration_ms
+    FROM quiz_attempts
+    ORDER BY
+      datetime(quiz_date) DESC,
+      id DESC
+    LIMIT ?
+    """
+
+    with app_cursor() as c:
+        c.execute(sql, (limit,))
+        rows = c.fetchall()
+
+    # sqlite row_factory dict değilse tuple döner; ikisini de handle edelim
+    out: List[Dict[str, Any]] = []
+    cols = [
+        "id",
+        "user_id",
+        "quiz_date",
+        "topic",
+        "difficulty",
+        "total_questions",
+        "correct_answers",
+        "score",
+        "total_duration_ms",
+    ]
+
+    for r in rows:
+        if isinstance(r, dict):
+            d = dict(r)
+        else:
+            d = {cols[i]: r[i] for i in range(len(cols))}
+
+        # UI uyumluluğu için (stats ekranında sık görülen isimler)
+        d.setdefault("created_at", d.get("quiz_date"))
+        d.setdefault("status", None)
+        d.setdefault("quiz_id", d.get("id"))  # quiz_id bekleyen yer varsa kırılmasın
+
+        out.append(d)
+
     return out

@@ -1,8 +1,5 @@
-# app/domain/services/chat_service.py
-
-import json
-import re
-from typing import List
+import time
+from typing import List, Dict, Any, Optional
 
 from app.domain.schemas.chat import (
     ChatTurnRequest,
@@ -12,85 +9,122 @@ from app.domain.schemas.chat import (
     ChatMode,
 )
 from app.domain.services.chat_modes import get_mode_config
-from app.domain.services.chat_system_prompts import get_system_prompt
+from app.domain.services.chat_system_prompts import (
+    get_system_prompt,
+    get_retry_system_prompt,
+)
 from app.domain.services.chat_llm import generate_chat_completion
 from app.domain.services.quiz_build_service import build_quiz_from_db
+from fastapi import HTTPException
+from app.domain.services.llm_service import ollama_slot, OllamaOverloadedError
+
+# Import new utils
+from app.domain.services.chat_utils import (
+    parse_quiz_intent,
+    parse_action,
+    extract_question_from_text,
+    find_last_question_from_history,
+    is_answer_only,
+    try_parse_json,
+    normalize_review_payload,
+    list_of_str,
+)
 
 
-def _parse_quiz_intent(text: str) -> int | None:
+async def _execute_llm_with_retry(
+    cfg: Any,
+    messages: List[ChatMessage],
+    retry_system_prompt: str = None,
+) -> Dict[str, Any]:
     """
-    Çok basit intent:
-    - '5 soru', '10 soru' gibi mesajlarda sayı yakalayıp quiz hazırlamaya yönlendirir.
+    LLM call wrapper with integrated retry logic for JSON parsing issues.
+    Reusable for both initial call and retry attempts.
     """
-    if not text:
-        return None
-
-    t = text.lower()
-    m = re.search(r"(\d+)\s*soru", t)
-    if m:
-        try:
-            n = int(m.group(1))
-            if 1 <= n <= 20:
-                return n
-        except Exception:
-            return None
-
-    if t.strip() in {"quiz", "test", "soru sor"}:
-        return 5
-
-    return None
-
-
-def _try_parse_json(text: str) -> dict | None:
-    """
-    LLM bazen JSON'u string olarak, bazen markdown fence ile döndürebilir.
-    Burada robust şekilde dict parse etmeye çalışıyoruz.
-    """
-    if not text:
-        return None
-
-    t = text.strip()
-
-    # ```json ... ``` varsa ayıkla
-    m = re.search(r"```json\s*(\{.*?\})\s*```", t, flags=re.S)
-    if m:
-        t = m.group(1).strip()
-
-    # direkt dict parse
+    provider = str(cfg.provider).lower()
+    
+    # 1. Initial Call
+    t0 = time.perf_counter()
     try:
-        obj = json.loads(t)
-        if isinstance(obj, dict):
-            return obj
-    except Exception:
-        pass
-
-    # metin içinde ilk { ... } bloğunu yakala (fallback)
-    m2 = re.search(r"(\{.*\})", t, flags=re.S)
-    if m2:
+        if provider.startswith("ollama"):
+            async with ollama_slot():
+                result = await generate_chat_completion(
+                    provider=cfg.provider,
+                    model=cfg.model,
+                    messages=messages,
+                    temperature=cfg.temperature,
+                )
+        else:
+            result = await generate_chat_completion(
+                provider=cfg.provider,
+                model=cfg.model,
+                messages=messages,
+                temperature=cfg.temperature,
+            )
+    except OllamaOverloadedError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    
+    latency = int((time.perf_counter() - t0) * 1000)
+    content = (result.get("content") or "").strip()
+    usage = result.get("usage") or {}
+    
+    # Check if we need retry (only if retry_prompt provided AND json parse failed)
+    if retry_system_prompt and try_parse_json(content) is None:
+        # Prepare retry messages
+        retry_msgs = list(messages)
+        retry_msgs.append(
+            ChatMessage(role=ChatMessageRole.SYSTEM, content=retry_system_prompt)
+        )
+        
+        # 2. Retry Call (Temp 0.0 for stability)
+        t_retry = time.perf_counter()
         try:
-            obj = json.loads(m2.group(1))
-            if isinstance(obj, dict):
-                return obj
-        except Exception:
-            return None
+            if provider.startswith("ollama"):
+                async with ollama_slot():
+                    retry_res = await generate_chat_completion(
+                        provider=cfg.provider,
+                        model=cfg.model,
+                        messages=retry_msgs,
+                        temperature=0.0,
+                    )
+            else:
+                retry_res = await generate_chat_completion(
+                    provider=cfg.provider,
+                    model=cfg.model,
+                    messages=retry_msgs,
+                    temperature=0.0,
+                )
+        except OllamaOverloadedError as e:
+            raise HTTPException(status_code=429, detail=str(e))
 
-    return None
+        retry_latency = int((time.perf_counter() - t_retry) * 1000)
+        
+        # Merge results
+        final_content = (retry_res.get("content") or "").strip()
+        final_usage = {
+            **usage,
+            "retry": True,
+            "latency_ms": latency,
+            "retry_latency_ms": retry_latency,
+            "latency_ms_total": latency + retry_latency,
+        }
+        return {"content": final_content, "usage": final_usage}
+
+    # No retry needed
+    final_usage = {
+        **usage,
+        "retry": False,
+        "latency_ms": latency,
+        "latency_ms_total": latency,
+    }
+    return {"content": content, "usage": final_usage}
 
 
-async def handle_chat_turn(
-    req: ChatTurnRequest,
-    user_id: int | None = None,
-) -> ChatTurnResponse:
+async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
     """
-    - quiz intent yakala (LLM'e gitmeden)
-    - mode config çek
-    - sistem prompt üret
-    - history + mesaj ile LLM'e git
-    - response dön
+    Handles requests that don't need LLM (e.g., direct quiz intents).
     """
-
-    # A) Quiz intent → LLM çağırmadan hızlı cevap
-    n_intent = _parse_quiz_intent(req.message)
+    # A) Quiz Intent
+    n_intent = parse_quiz_intent(req.message)
     if n_intent:
         quiz_topic = req.topic or "security_policy"
         quiz_level = req.level or "beginner"
@@ -109,24 +143,92 @@ async def handle_chat_turn(
             "Başlatmak ister misin?"
         )
 
-        suggestions = ["Evet başlat", "5 soru", "10 soru", "Topic değiştir"]
-
         return ChatTurnResponse(
             mode=req.mode,
             topic=req.topic,
             level=req.level,
             reply=reply,
-            suggestions=suggestions,
-            actions=None,
+            suggestions=["Evet başlat", "5 soru", "10 soru", "Topic değiştir"],
             raw_model="local:intent-parser",
-            usage=None,
-            error=None,
             session_id=req.session_id,
         )
 
-    # B) Normal chat akışı
-    mode_cfg = get_mode_config(req.mode)
+    # B) Review Mode Actions
+    if req.mode == ChatMode.REVIEW:
+        action_type, action_input = parse_action(req.message)
 
+        if action_type == "new_question":
+            return ChatTurnResponse(
+                mode=req.mode,
+                topic=req.topic,
+                level=req.level,
+                reply="Tamam. Bu konudan yeni bir soru hazırlıyorum.",
+                suggestions=["Quiz’i başlat", "Soru sayısını 5 yap", "Topic değiştir"],
+                actions=[{
+                    "type": "start_quiz",
+                    "payload": {
+                        "topic": req.topic, "level": req.level, "n": 1,
+                        "qtype": "mixed", "use_ollama": True
+                    }
+                }],
+                raw_model="local:review-new_question-bypass",
+                session_id=req.session_id,
+            )
+
+        if action_type == "quiz_from_gaps":
+            data = try_parse_json(action_input) or {}
+            n = max(1, min(20, int(data.get("n", 5) or 5)))
+            gaps = data.get("gaps") if isinstance(data.get("gaps"), list) else []
+            
+            return ChatTurnResponse(
+                mode=req.mode,
+                topic=req.topic,
+                level=req.level,
+                reply=f"Tamam. Eksiklerine odaklı {n} soruluk quiz hazırlıyorum.",
+                suggestions=["Quiz’i başlat", "Soru sayısını 10 yap"],
+                actions=[{
+                    "type": "start_quiz",
+                    "payload": {
+                        "topic": req.topic, "level": req.level, "n": n,
+                        "qtype": "mixed", "use_ollama": True, "focus_gaps": gaps[:5]
+                    }
+                }],
+                raw_model="local:review-quiz_from_gaps-bypass",
+                session_id=req.session_id,
+            )
+
+        if action_type == "quiz_topic":
+            data = try_parse_json(action_input) or {}
+            n = max(1, min(20, int(data.get("n", 5) or 5)))
+            
+            return ChatTurnResponse(
+                mode=req.mode,
+                topic=req.topic,
+                level=req.level,
+                reply=f"Tamam. Bu konudan {n} soruluk quiz hazırlıyorum.",
+                suggestions=["Quiz’i başlat", "Soru sayısını 10 yap"],
+                actions=[{
+                    "type": "start_quiz",
+                    "payload": {
+                        "topic": req.topic, "level": req.level, "n": n,
+                        "qtype": "mixed", "use_ollama": True
+                    }
+                }],
+                raw_model="local:review-quiz_topic-bypass",
+                session_id=req.session_id,
+            )
+
+    return None
+
+
+async def handle_heavy_turn(req: ChatTurnRequest, user_id: int | None = None) -> ChatTurnResponse:
+    """
+    Handles complex turns requiring LLM or RAG.
+    """
+    action_type, action_input = parse_action(req.message)
+    mode_cfg = get_mode_config(req.mode)
+    
+    # 1. Prepare System Prompt
     system_prompt = get_system_prompt(
         mode=req.mode,
         topic=req.topic,
@@ -134,107 +236,94 @@ async def handle_chat_turn(
         language=req.language or "tr",
     )
 
-    messages: List[ChatMessage] = []
-    messages.append(ChatMessage(role=ChatMessageRole.SYSTEM, content=system_prompt))
+    # 2. Add RAG Context (if eligible)
+    if req.use_rag and (req.mode != ChatMode.REVIEW or (req.mode == ChatMode.REVIEW and not action_type)):
+        from app.domain.services.rag_service import rag_service
+        kb_context = rag_service.retrieve_context(req.message, collection_name="knowledge-base", n_results=2)
+        if kb_context:
+            system_prompt += f"\n\nBİLGİ BANKASI (Bağlam):\n{kb_context}\n\nLütfen cevap verirken yukarıdaki bilgileri öncelikli olarak dikkate al."
 
+    # 3. Add Review-specific format instructions
+    if req.mode == ChatMode.REVIEW and action_type:
+        if action_type == "improve":
+            system_prompt += '\n\nÇIKTI FORMATI: Şema: {"answer": "2-8 cümle..."}. SADECE JSON.'
+        elif action_type == "ask_gaps":
+            system_prompt += '\n\nÇIKTI FORMATI: Şema: {"questions": ["..."]}. SADECE JSON.'
+
+    # 4. Construct Messages
+    messages = [ChatMessage(role=ChatMessageRole.SYSTEM, content=system_prompt)]
     if req.history:
-        history_trimmed = req.history[-mode_cfg.max_history :]
-        messages.extend(history_trimmed)
+        messages.extend(req.history[-mode_cfg.max_history :])
 
-    messages.append(ChatMessage(role=ChatMessageRole.USER, content=req.message))
-
-    llm_result = await generate_chat_completion(
-        provider=mode_cfg.provider,
-        model=mode_cfg.model,
-        messages=messages,
-        temperature=mode_cfg.temperature,
-    )
-
-    reply_text: str = (llm_result.get("content") or "").strip()
-
-    actions: list[dict] | None = None
-    suggestions: list[str] | None = None
-
-    # ---------------------------
-    # REVIEW MODE: JSON'u normalize et + action üret
-    # ---------------------------
-    if req.mode == ChatMode.REVIEW:
-        data = _try_parse_json(reply_text)
-
-        if data:
-            score = int(data.get("score", 0) or 0)
-            score = max(0, min(10, score))
-
-            # ✅ tek kaynak: score
-            is_correct = score >= 6
-
-            feedback = (data.get("feedback") or "").strip()
-            feedback_lower = feedback.lower()
-            if score <= 3 and ("doğru" in feedback_lower or "harika" in feedback_lower):
-                feedback = "Cevabın kısmen doğru bir noktaya değiniyor ama eksik. Daha kapsamlı açıklama gerekli."
-            improvement = (data.get("improvement") or "").strip()
-            sugg = data.get("suggestions") or []
-            if not isinstance(sugg, list):
-                sugg = []
-
-            reply_text = (
-                f"Sonuç: {'✅ Doğru' if is_correct else '❌ Yanlış/Kısmen'}\n"
-                f"Puan: {score}/10\n"
-                f"Geri bildirim: {feedback or '—'}\n"
-                f"Geliştirme: {improvement or '—'}\n"
-                f"Öneriler: {', '.join(sugg) if sugg else '—'}"
-            )
-
-            actions = [
-                {
-                    "type": "review_result",
-                    "payload": {
-                        "score": score,
-                        "is_correct": is_correct,
-                        "feedback": feedback,
-                        "improvement": improvement,
-                        "suggestions": sugg,
-                    },
-                }
-            ]
-
-            # review modunda yardımcı hızlı butonlar (opsiyonel)
-            suggestions = [
-                "Cevabımı geliştir",
-                "Daha iyi örnek cevap ver",
-                "Bu konudan yeni soru sor",
-            ]
+    # 5. Determine User Content (Logic for Review 'Answer Only' format)
+    user_content = action_input if (req.mode == ChatMode.REVIEW and action_type) else req.message
+    if req.mode == ChatMode.REVIEW and not action_type and is_answer_only(user_content):
+        last_q = find_last_question_from_history(req.history)
+        if last_q:
+            user_content = f"SORU: {last_q}\nCEVAP: {user_content}"
         else:
-            # JSON parse edilemezse en azından kullanıcıyı yönlendir
-            suggestions = [
-                "Şu formatta dene: SORU: ... BENİM CEVABIM: ...",
-                "Örnek cevap ver",
-            ]
+            user_content = f"SORU: (bulunamadı)\nCEVAP: {user_content}\n(Soru bulunamadı, lütfen SORU: ... CEVAP: ... formatında yaz)"
 
-    # ---------------------------
-    # TUTOR MODE: suggestions + start_quiz action
-    # ---------------------------
-    if req.mode == ChatMode.TUTOR:
-        suggestions = [
-            "Bu konuyla ilgili örnek soru ver",
-            "Biraz daha detaylı açıklar mısın?",
-            "Basit bir özet yap",
-            "5 soru",
-        ]
+    messages.append(ChatMessage(role=ChatMessageRole.USER, content=user_content))
+    
+    # 6. Determine Retry Prompt Strategy
+    retry_prompt = None
+    if req.mode == ChatMode.REVIEW and action_type in (None, "improve", "ask_gaps"):
+        retry_prompt = get_retry_system_prompt(action_type)
 
+    # 7. Execute LLM Logic
+    result = await _execute_llm_with_retry(mode_cfg, messages, retry_prompt)
+    
+    reply_text = result["content"]
+    usage = {
+        **result["usage"],
+        "provider": mode_cfg.provider,
+        "model": mode_cfg.model,
+        "mode": str(req.mode),
+    }
+
+    # 8. Post-Process Response (Actions/Suggestions)
+    actions = None
+    suggestions = None
+
+    if req.mode == ChatMode.REVIEW:
+        if action_type == "improve":
+            data = try_parse_json(reply_text) or {}
+            answer = (data.get("answer") or "").strip() or reply_text
+            actions = [{"type": "improved_answer", "payload": {"answer": answer}}]
+            reply_text = "Tamam. Cevabını daha iyi hale getirdim."
+            suggestions = ["Input’a uygula", "Tekrar değerlendir"]
+        elif action_type == "ask_gaps":
+            data = try_parse_json(reply_text) or {}
+            questions = list_of_str(data.get("questions"))
+            actions = [{"type": "clarifying_questions", "payload": {"questions": questions[:7]}}]
+            reply_text = "Eksiklerini netleştirmek için birkaç soru çıkardım."
+            suggestions = ["Seçilenleri input’a ekle", "Tekrar değerlendir"]
+        else:
+            # Assessment Result
+            data = try_parse_json(reply_text)
+            if data:
+                payload = normalize_review_payload(data)
+                score = payload["score"]
+                label = "Geçer" if score >= 6 else "Geliştirilmeli"
+                hint = payload["gaps"][0] if payload["gaps"] else ""
+                reply_text = f"{label}. Puanın {score}/10. {hint}".strip()
+                actions = [{"type": "review_result", "payload": payload}]
+                suggestions = ["Cevabımı geliştir", "Eksiklerimi sor", "Bu konudan yeni soru sor"]
+            else:
+                reply_text = "JSON formatı geçerli değil. Lütfen tekrar dene."
+                suggestions = ["Sadece cevabını yaz"]
+
+    elif req.mode == ChatMode.TUTOR:
+        suggestions = ["Örnek soru ver", "Detaylandır", "Özetle", "5 soru"]
         if req.message.strip().lower() in {"evet başlat", "başlat", "start", "quiz başlat"}:
-            actions = [
-                {
-                    "type": "start_quiz",
-                    "payload": {
-                        "topic": req.topic,
-                        "level": req.level,
-                        "n": 5,
-                        "qtype": "mixed",
-                        "use_ollama": False,
-                    },
+            actions = [{
+                "type": "start_quiz",
+                "payload": {
+                    "topic": req.topic, "level": req.level, "n": 5,
+                    "qtype": "mixed", "use_ollama": False
                 }
-            ]
+            }]
 
     return ChatTurnResponse(
         mode=req.mode,
@@ -244,7 +333,6 @@ async def handle_chat_turn(
         suggestions=suggestions,
         actions=actions,
         raw_model=f"{mode_cfg.provider}:{mode_cfg.model}",
-        usage=None,
-        error=None,
+        usage=usage,
         session_id=req.session_id,
     )

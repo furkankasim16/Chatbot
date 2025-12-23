@@ -7,8 +7,8 @@ import { Suspense } from "react"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
+  title: "Quiz Asistanı",
+  description: "Yapay zeka destekli interaktif öğrenme platformu",
   generator: "v0.app",
 }
 
@@ -18,8 +18,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="tr" className="dark">
+      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased selection:bg-primary/30 selection:text-primary-foreground`}>
         <Suspense fallback={null}>
           {children}
           <Analytics />

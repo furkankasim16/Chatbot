@@ -39,9 +39,11 @@ class UserStats(BaseModel):
     avg_quiz_duration_ms: float = 0.0
 
     # ⏱️ Soru bazlı süreler
+    today_question_count: Optional[int] = 0
     total_questions_timed: int = 0
     total_question_duration_ms: int = 0
     avg_question_duration_ms: float = 0.0
+    recommended_study_topics: List[str] = []
 
 
 # ---------- Auth helpers ----------
@@ -146,6 +148,23 @@ def user_stats(current=Depends(get_current_user)):
     total_question_duration_ms = int(qtime_row[1] or 0)
     avg_question_duration_ms = float(qtime_row[2] or 0.0)
 
+    # 💡 RECOMMENDATION ENGINE
+    # Başarı oranı %60'ın altındaki konuları "Çalışılması Gerekenler" olarak öner.
+    recommendations = []
+    for topic_name, stats in topic_stats.items():
+        total = stats["total"]
+        correct = stats["correct"]
+        if total > 0:
+            rate = correct / total
+            if rate < 0.6:
+                recommendations.append(topic_name)
+    
+    # Hiç veri yoksa veya hepsi iyiyse rastgele bir konu öner (boş kalmasın)
+    if not recommendations and not topic_stats:
+         recommendations = ["Genel Tekrar (Henüz quiz çözmedin)"]
+    elif not recommendations:
+         recommendations = ["Tebrikler! Tüm konularda performansın iyi.", "Zorluğu artırmayı dene."]
+
     return {
         "total_quizzes": int(tq[0]),
         "total_questions": int(tq[1]),
@@ -158,6 +177,7 @@ def user_stats(current=Depends(get_current_user)):
         "total_questions_timed": total_questions_timed,
         "total_question_duration_ms": total_question_duration_ms,
         "avg_question_duration_ms": avg_question_duration_ms,
+        "recommended_study_topics": recommendations,
     }
 
 @router.post("/register", dependencies=[Depends(on_start_app_db)])

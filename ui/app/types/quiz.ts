@@ -36,6 +36,7 @@ export interface ScenarioStep {
   _action?: ScenarioStepAction  // create / update / delete
 
   [key: string]: any
+  source_context?: string;
 }
 
 export interface ScenarioQuestionPatch {
@@ -77,4 +78,5 @@ export interface Question {
   steps?: ScenarioStep[]
 
   meta?: Record<string, any>
+  source_context?: string
 }

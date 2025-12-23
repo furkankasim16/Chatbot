@@ -1,0 +1,32 @@
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies (for building some python packages if needed)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python3 -
+ENV PATH="/root/.local/bin:$PATH"
+
+# Copy project files
+COPY pyproject.toml poetry.lock* ./
+
+# Check if poetry.lock exists, otherwise generate it to avoid errors (robustness)
+RUN if [ ! -f poetry.lock ]; then poetry lock; fi
+
+# Install dependencies (no devs)
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi --no-root --only main
+
+COPY . .
+
+# Expose port
+EXPOSE 8000
+
+# Run
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

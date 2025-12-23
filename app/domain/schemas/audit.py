@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class AuditLog(BaseModel):
     id: Optional[int] = None
     user_id: Optional[int] = None
+    username: Optional[str] = None  # UI'da göstermek için join ile doldurulacak
     action: str
 
     # 🔹 yeni eklediğimiz alanlar:

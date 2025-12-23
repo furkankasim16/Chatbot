@@ -24,5 +24,11 @@ def llm_stats_summary() -> List[LLMStatsSummary]:
     - avg/min/max latency
     - avg input/output tokens
     """
-    stats = get_llm_stats_summary()
-    return [LLMStatsSummary(**row) for row in stats]
+    try:
+        stats = get_llm_stats_summary()
+        return [LLMStatsSummary(**row) for row in stats]
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Stats Error: {str(e)}")

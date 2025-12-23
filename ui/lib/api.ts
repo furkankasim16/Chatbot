@@ -24,7 +24,8 @@ export interface ChatTurnRequest {
   level?: string | null
   message: string
   history?: ChatMessage[]
-  session_id?: string | null 
+  session_id?: string | null
+  use_rag?: boolean
 }
 
 export interface ChatTurnResponse {
@@ -40,6 +41,14 @@ export interface ChatTurnResponse {
   actions?: { type: string; payload?: any }[] | null
 }
 
+export interface ChatJobResponse {
+  job_id: string
+  status: "queued" | "completed" | "failed" | "started" | "deferred" | "scheduled" | "not_found" | "expired"
+  result?: ChatTurnResponse
+  waited_ms?: number
+  error?: string | null
+}
+
 // 🔹 Base URL’leri tek yerde topluyoruz
 const API_ROOT = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const API = `${API_ROOT}/api/v1`
@@ -48,14 +57,14 @@ const CHAT_API = `${API}/chat`
 export interface Question {
   id?: string
   type:
-    | "mcq"
-    | "true_false"
-    | "short_answer"
-    | "scenario"
-    | "open_ended"
-    | "short"
-    | "senaryo"
-    | "open"
+  | "mcq"
+  | "true_false"
+  | "short_answer"
+  | "scenario"
+  | "open_ended"
+  | "short"
+  | "senaryo"
+  | "open"
   topic: string
   level: string
   stem: string
@@ -73,6 +82,7 @@ export interface Question {
   }
   source_model?: string
   source_type?: string
+  source_context?: string
 }
 
 export interface QuizResponse {
@@ -113,6 +123,7 @@ export interface UserStats {
   total_questions_timed: number
   total_question_duration_ms: number
   avg_question_duration_ms: number
+  recommended_study_topics: string[]
 }
 
 export interface QuizResult {
@@ -145,10 +156,16 @@ export interface EvaluateAnswerRequest {
   user_answer: string
 }
 
-export interface EvaluateAnswerResponse {
-  score: number
+export interface EvaluateAnswerOut {
   is_correct: boolean
+  score?: number
   feedback?: string
+  rubric?: Array<{
+    criteria: string
+    score: number
+    max_score: number
+    feedback: string
+  }>
 }
 
 export interface ChatRequest {
@@ -232,6 +249,20 @@ export async function getAuditLogs(
   } finally {
     clearTimeout(timeoutId)
   }
+}
+
+
+export interface AuditStats {
+  daily_activity: { date: string; count: number }[]
+  action_distribution: { action: string; count: number }[]
+}
+
+export async function getAuditStats(token: string): Promise<AuditStats> {
+  const res = await fetch(`${API}/admin/audit-stats`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("İstatistikler alınamadı")
+  return res.json()
 }
 
 export interface QuestionResultDetail {
@@ -566,10 +597,11 @@ export async function generateQuestionWithParams(
   level: string,
   qtype: string,
   model: string,
+  useRag: boolean = false,
 ) {
   const url = `${API}/admin/generate-question?topic=${encodeURIComponent(
     topic,
-  )}&level=${level}&qtype=${qtype}&model=${encodeURIComponent(model)}`
+  )}&level=${level}&qtype=${qtype}&model=${encodeURIComponent(model)}&use_rag=${useRag}`
   const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -686,7 +718,7 @@ export async function evaluateAnswer(
   question: string,
   expected: string,
   userAnswer: string,
-): Promise<EvaluateAnswerResponse> {
+): Promise<EvaluateAnswerOut> {
   console.log("[v0] evaluateAnswer called")
   console.log("[v0] Question:", question)
   console.log("[v0] Expected:", expected)
@@ -713,9 +745,49 @@ export async function evaluateAnswer(
     throw new Error("Cevap değerlendirilemedi")
   }
 
-  const result = (await res.json()) as EvaluateAnswerResponse
+  const result = (await res.json()) as EvaluateAnswerOut
   console.log("[v0] evaluateAnswer response:", result)
   return result
+}
+
+// 🔹 CHAT
+export async function sendChatTurn(
+  token: string,
+  payload: ChatTurnRequest,
+): Promise<ChatTurnResponse | ChatJobResponse> {
+  const res = await fetch(`${CHAT_API}/turn`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "")
+    // 429 özel durum
+    if (res.status === 429) {
+      throw new Error("Sistem şu an çok yoğun, lütfen kısa süre sonra tekrar deneyin.")
+    }
+    throw new Error(`Mesaj gönderilemedi: ${res.status} ${txt}`)
+  }
+  return res.json()
+}
+
+export async function getChatJobResult(
+  token: string,
+  jobId: string,
+): Promise<ChatJobResponse> {
+  const res = await fetch(`${CHAT_API}/result/${jobId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (!res.ok) {
+    throw new Error(`Job result check failed: ${res.status}`)
+  }
+  return res.json()
 }
 
 export async function sendChatMessage(
@@ -784,11 +856,52 @@ export async function startQuizTiming(
   token: string,
   payload: StartQuizAttemptPayload,
 ): Promise<{ attempt_id: number }> {
-  return authPost<{ attempt_id: number }>(
-    `${API}/quiz/attempt/start`,
-    token,
-    payload,
-  )
+  return authPost<{ attempt_id: number }>(`${API}/quiz/attempt/start`, token, payload)
+}
+
+// 🔹 KNOWLEDGE BASE
+export async function scanCorpus(token: string) {
+  const res = await fetch(`${API}/admin/knowledge-base/scan`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!res.ok) throw new Error("Tarama başlatılamadı")
+  return res.json()
+}
+
+export async function resetKnowledgeBase(token: string) {
+  const res = await fetch(`${API}/admin/knowledge-base/reset`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!res.ok) throw new Error("Sıfırlama başarısız")
+  return res.json()
+}
+
+// 🔹 Upload PDF explicitly for RAG Indexing
+export async function uploadPdfToRag(
+  token: string,
+  file: File,
+  topic: string = "general"
+) {
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("topic", topic)
+
+  const res = await fetch(`${API}/rag/index`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: formData
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || "PDF yüklenemedi")
+  }
+
+  return res.json()
 }
 
 // End quiz timing
@@ -878,7 +991,7 @@ export async function finishQuizAttempt(
   )
 }
 
-export async function fetchLlmStatsSummary(): Promise<LlmStatsSummary[]> {
+export async function fetchLlmStatsSummary(token: string): Promise<LlmStatsSummary[]> {
   const url = `${API}/admin/llm-stats/summary`
   console.log("[LLM] fetchLlmStatsSummary ->", url)
 
@@ -888,6 +1001,9 @@ export async function fetchLlmStatsSummary(): Promise<LlmStatsSummary[]> {
   try {
     const res = await fetch(url, {
       method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
       next: { revalidate: 0 },
       signal: controller.signal,
     })
@@ -1102,21 +1218,3 @@ export async function getChatModes(token: string): Promise<Record<string, ChatMo
   return res.json()
 }
 
-export async function sendChatTurn(
-  token: string,
-  payload: ChatTurnRequest,
-): Promise<ChatTurnResponse> {
-  const res = await fetch(`${CHAT_API}/turn`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  })
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "")
-    throw new Error(`sendChatTurn failed: ${res.status} ${txt}`)
-  }
-  return res.json()
-}

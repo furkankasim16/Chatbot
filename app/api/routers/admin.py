@@ -26,8 +26,14 @@ from app.domain.repositories.quesitons_repo import (
 )
 from app.domain.repositories.quiz_repo import user_activity
 from app.domain.services.audit_service import log_action, get_recent_logs
+from app.domain.repositories.audit_repo import get_audit_stats
 from app.domain.schemas.question import QuestionModel
 from app.domain.schemas.audit import AuditLog
+from app.domain.schemas.audit import AuditLog
+from app.core.rag import rag_client
+from app.services.pdf_service import pdf_service
+from starlette.concurrency import run_in_threadpool
+import hashlib
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -61,26 +67,49 @@ async def gen_question(
     level: str,
     qtype: str = "mcq",  # "mcq", "true_false", "short_answer", "open_ended", "scenario"
     model: LLMModel = LLMModel.OLLAMA_LOCAL,
+    dry_run: bool = False,
+    use_rag: bool = False,
     _=Depends(on_start_questions_db),
     current_user: dict = Depends(get_current_user),
 ):
     """
     Seçilen LLM modeliyle yeni soru üretir, DB'ye kaydeder ve audit log atar.
     Yeni unified QuestionModel yapısını ve generate_question pipeline'ını kullanır.
+    dry_run=True ise DB'ye kaydetmez, id=0 döner.
+    use_rag=True ise Knowledge Base'den konuyla ilgili bağlam çeker.
     """
 
     difficulty = _map_level_to_difficulty(level)
+
+    context = None
+    if use_rag:
+        try:
+            # Topic tabanlı arama
+            # n_results=3 genelde yeterli context oluşturur
+            results = rag_client.query(query_text=topic, n_results=3)
+            docs = results.get("documents", [])
+            if docs and docs[0]:
+                context = "\n\n".join(docs[0])
+                print(f"[RAG] Context found for topic '{topic}' ({len(context)} chars)")
+            else:
+                print(f"[RAG] No context found for topic '{topic}'")
+        except Exception as e:
+            print(f"[RAG] Error fetching context: {e}")
 
     params: Dict[str, Any] = {
         "question_type": qtype,
         "topic": topic,
         "difficulty": difficulty,
     }
+    
+    if context:
+        params["context"] = context
 
     # Yeni pipeline: LLM → JSON → QuestionModel → DB
     q: QuestionModel = await generate_question(
         model_name=model.value,  # LLMModel enum → string
         params=params,
+        save=not dry_run,
     )
 
     if getattr(q, "id", None) is None:
@@ -99,6 +128,7 @@ async def gen_question(
             "difficulty": difficulty,
             "qtype": qtype,
             "model": model.value,
+            "dry_run": dry_run,
         },
     )
 
@@ -111,6 +141,7 @@ async def gen_question(
 @router.post("/generate-random-question", response_model=QuestionModel)
 async def generate_random_question(
     model: LLMModel = LLMModel.OLLAMA_LOCAL,
+    dry_run: bool = False,
     _=Depends(on_start_questions_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -131,6 +162,7 @@ async def generate_random_question(
     q: QuestionModel = await generate_question(
         model_name=model.value,
         params=params,
+        save=not dry_run,
     )
 
     if getattr(q, "id", None) is None:
@@ -147,6 +179,7 @@ async def generate_random_question(
             "difficulty": difficulty,
             "qtype": "mcq",
             "model": model.value,
+            "dry_run": dry_run,
         },
     )
 
@@ -207,14 +240,33 @@ def list_audit_logs(
     return get_recent_logs(limit=limit)
 
 
+@router.get("/audit-stats")
+def audit_stats_endpoint(
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Dashboard için görselleştirme verileri.
+    """
+    # Loglamak istersek loglarız ama "View Dashboard" gibi çok sık çağrılan bir şey log kirliliği yaratabilir.
+    # Şimdilik loglamayalım veya 'verbose' bir aksiyon olarak loglayalım.
+    return get_audit_stats()
+
+
 @router.get("/llm-stats/summary", response_model=List[LLMStatsSummary])
-def llm_stats_summary() -> List[LLMStatsSummary]:
+def llm_stats_summary(
+    current_user: dict = Depends(get_current_user),
+) -> List[LLMStatsSummary]:
     """
     LLM model bazlı performans özeti:
     - total_calls
     - avg/min/max latency
     - avg input/output tokens
     """
+    log_action(
+        user_id=current_user["id"],
+        action="ADMIN_VIEW_LLM_STATS",
+        details={},
+    )
     stats = get_llm_stats_summary()
     return [LLMStatsSummary(**row) for row in stats]
 
@@ -290,12 +342,96 @@ async def generate_from_pdf(
     qtype: str = Form("mcq"),
     model: Optional[str] = Form(None),
     file: UploadFile = File(...),
-    _ = Depends(require_admin),
+    current_user: dict = Depends(require_admin),
 ):
-    # TODO: buraya kendi PDF → chunk → embedding → LLM prompt akışını koyacaksın
-    # 1) file.file ile PDF içeriğini oku
-    # 2) İlgili sayfalardan context çıkar
-    # 3) LLM'e "bu PDF içinden {topic}/{level} bir {qtype} soru üret" promptu gönder
-    # 4) Dönen sonucu QuestionModel formatına map et ve return et
+    # Log the attempt first
+    log_action(
+        user_id=current_user["id"],
+        action="ADMIN_GENERATE_FROM_PDF",
+        details={
+            "filename": file.filename,
+            "topic": topic,
+            "level": level,
+            "qtype": qtype,
+            "model": model,
+        },
+    )
 
-    raise HTTPException(status_code=501, detail="Henüz implemente edilmedi")
+    try:
+        content = await file.read()
+        
+        # 1. Chunking and Indexing
+        # We use a user-specific 'session' topic or just index globally with robust metadata
+        # For this feature, we want to index the PDF and immediately use it.
+        # Let's assume we add it to the global knowledge base but filtered by file name or just retrieve relevant chunks.
+        
+        chunks, metadatas, ids = await pdf_service.extract_and_chunk(
+            file_content=content,
+            filename=file.filename,
+            topic=topic
+        )
+        
+        if not chunks:
+             raise HTTPException(status_code=400, detail="PDF'ten metin çıkarılamadı.")
+
+        # Indexing (Blocking call, but fast for single PDF usually)
+        # Note: If valid IDs conflict, it might error or update depending on Chroma version.
+        # We can append a timestamp or random hash to IDs if versioning is needed.
+        rag_client.add_documents(chunks, metadatas, ids)
+        
+        # 2. Retrieve Context relevant to the *topic* from this PDF
+        # We filter by filename to ensure we only generate from THIS PDF
+        results = rag_client.query(
+            query_text=topic,
+            n_results=5,
+            where={"source": file.filename}
+        )
+        
+        # Unpack results
+        # results['documents'] is list of list of strings
+        context_list = results.get("documents", [[]])[0]
+        context = "\n\n".join(context_list)
+        
+        if not context:
+             # Fallback: Use random chunks from this file if topic-based retrieval failed
+             context = "\n\n".join(chunks[:5])
+
+        difficulty = _map_level_to_difficulty(level)
+        
+        params: Dict[str, Any] = {
+            "question_type": qtype,
+            "topic": topic,
+            "difficulty": difficulty,
+            "context": context
+        }
+
+        # Use the selected model or default to OLLAMA_LOCAL
+        model_enum = LLMModel.OLLAMA_LOCAL
+        if model:
+            try:
+                # Try to match string to enum
+                model_enum = LLMModel(model)
+            except ValueError:
+                # Fallback or keep default if invalid
+                pass
+
+        q: QuestionModel = await generate_question(
+            model_name=model_enum.value,
+            params=params,
+        )
+
+        if getattr(q, "id", None) is None:
+            raise HTTPException(status_code=500, detail="Question ID not set after generation")
+        
+        # Add source file info to tags
+        if q.tags:
+            q.tags.append(f"source:{file.filename}")
+        else:
+            q.tags = [f"source:{file.filename}"]
+
+        return q
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"PDF işleme hatası: {str(e)}")

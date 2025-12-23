@@ -41,11 +41,13 @@ LEVELS: List[DifficultyLevel] = [
 
 # --- LLM çağrıları ----------------------------------------------------
 
+import time
+from app.domain.repositories.llm_run_repo import add_llm_run
 
-def _ollama_generate(prompt: str, model: Optional[str] = None) -> str:
+def _ollama_generate(prompt: str, model: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
     """
     Ollama ile sync generate çağrısı.
-    model_name: sadece model ismi (örn: 'llama3', 'qwen:7b' vb.)
+    Returns: (content, usage_dict)
     """
     base = str(settings.OLLAMA_URL).rstrip("/")
     model = model or settings.OLLAMA_MODEL
@@ -57,53 +59,53 @@ def _ollama_generate(prompt: str, model: Optional[str] = None) -> str:
         "stream": False,
     }
 
-    r = requests.post(url, json=payload, timeout=60)
+    start = time.perf_counter()
+    r = requests.post(url, json=payload, timeout=300)
     r.raise_for_status()
-    data = r.json()
-    # Ollama generate cevabı: {"model": "...", "response": "...", ...}
-    return data["response"]
+    duration_ms = int((time.perf_counter() - start) * 1000)
 
-def _gemini_generate(prompt: str, model: str) -> str:
-    """
-    Gemini generateContent çağrısı.
-    Biz unified şema JSON'unu prompt'ta tarif ediyoruz,
-    Gemini'den dönen text'i direkt parse edeceğiz.
-    """
+    data = r.json()
+    usage = {
+        "latency_ms": duration_ms,
+        "token_input": data.get("prompt_eval_count"),
+        "token_output": data.get("eval_count")
+    }
+    return data["response"], usage
+
+def _gemini_generate(prompt: str, model: str) -> Tuple[str, Dict[str, Any]]:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is not set")
 
     url = f"{GEMINI_API_BASE}/models/{model}:generateContent?key={GEMINI_API_KEY}"
     payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt}
-                ]
-            }
-        ]
+        "contents": [{"parts": [{"text": prompt}]}]
     }
 
+    start = time.perf_counter()
     r = requests.post(url, json=payload, timeout=60)
     try:
         r.raise_for_status()
     except requests.HTTPError:
         print("[GEMINI ERROR]", r.status_code, r.text)
         raise
+    duration_ms = int((time.perf_counter() - start) * 1000)
 
     data = r.json()
     try:
-        # Google Generative Language formatı
         text = data["candidates"][0]["content"]["parts"][0]["text"]
+        
+        usage_meta = data.get("usageMetadata", {})
+        usage = {
+            "latency_ms": duration_ms,
+            "token_input": usage_meta.get("promptTokenCount"),
+            "token_output": usage_meta.get("candidatesTokenCount")
+        }
     except Exception:
         raise RuntimeError(f"Gemini cevabı beklenen formatta değil: {data}")
 
-    return text
+    return text, usage
 
-def _groq_chat(prompt: str, model: str) -> str:
-    """
-    Groq OpenAI-compatible chat completions endpoint'i.
-    model: Groq model ID'si (örn: 'llama-3.1-8b-instant')
-    """
+def _groq_chat(prompt: str, model: str) -> Tuple[str, Dict[str, Any]]:
     if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY is not set")
 
@@ -115,34 +117,70 @@ def _groq_chat(prompt: str, model: str) -> str:
     payload = {
         "model": model,
         "messages": [
-            {
-                "role": "system",
-                "content": "You are a quiz generator assistant that returns ONLY JSON.",
-            },
+            {"role": "system", "content": "You are a quiz generator. Return ONLY JSON."},
             {"role": "user", "content": prompt},
         ],
-        # JSON dönmesi için:
         "response_format": {"type": "json_object"},
         "temperature": 0.2,
     }
 
+    start = time.perf_counter()
     r = requests.post(url, headers=headers, json=payload, timeout=60)
     r.raise_for_status()
+    duration_ms = int((time.perf_counter() - start) * 1000)
+    
     data = r.json()
-    return data["choices"][0]["message"]["content"]
+    content = data["choices"][0]["message"]["content"]
+
+    usage_meta = data.get("usage", {})
+    usage = {
+        "latency_ms": duration_ms,
+        "token_input": usage_meta.get("prompt_tokens"),
+        "token_output": usage_meta.get("completion_tokens")
+    }
+    return content, usage
 
 
-def _call_text_llm(model_name: str, prompt: str) -> str:
+def _mock_generate(prompt: str) -> Tuple[str, Dict[str, Any]]:
     """
-    model_name'e göre doğru backend'e gider:
-    - 'ollama:xxx' → Ollama
-    - 'llama-3.1-8b-instant' → Groq
-    - 'gemini-2.0-flash' → Gemini
+    Yük testi için sahte JSON üretir.
     """
+    # Basit bir fake response
+    fake_json = """
+    {
+        "question_type": "mcq",
+        "topic": "mock_topic",
+        "difficulty": "medium",
+        "stem": "Bu bir mock sorudur (Yük testi). Aşağıdakilerden hangisi doğrudur?",
+        "options": ["Seçenek A", "Seçenek B", "Seçenek C", "Seçenek D"],
+        "correct_option_indexes": [0],
+        "explanation": "Bu otomatik üretilmiş bir mock cevaptır.",
+        "tags": ["mock", "test"],
+        "max_score": 1
+    }
+    """
+    time.sleep(0.1)  # Biraz gecikme simülasyonu
+    usage = {
+        "latency_ms": 100,
+        "token_input": 50,
+        "token_output": 50
+    }
+    return fake_json, usage
+
+def _call_text_llm(model_name: str, prompt: str) -> Tuple[str, Dict[str, Any]]:
+    """
+    Returns (raw_content, usage_dict)
+    """
+    # 0) Mock
+    if model_name == "mock" or model_name.startswith("mock"):
+         return _mock_generate(prompt)
+
     # 1) Ollama
     if model_name.startswith("ollama:"):
-        ollama_model = settings.OLLAMA_MODEL
-        return _ollama_generate(prompt, model=ollama_model)
+        real_model = model_name.replace("ollama:", "", 1)
+        if not real_model:
+             real_model = settings.OLLAMA_MODEL
+        return _ollama_generate(prompt, model=real_model)
 
     # 2) Groq LLaMA3
     if model_name == LLMModel.GROQ_LLAMA3.value:
@@ -154,6 +192,36 @@ def _call_text_llm(model_name: str, prompt: str) -> str:
 
     # 4) Şimdilik diğerleri desteklenmiyor
     raise RuntimeError(f"Unsupported model in question_generation: {model_name}")
+
+
+# --- Yardımcılar ------------------------------------------------------
+
+
+def _find_json(s: str) -> str:
+    """
+    LLM cevabı içindeki ilk {...} bloğunu bulup döndürür.
+    """
+    i, j = s.find("{"), s.rfind("}")
+    if i >= 0 and j >= 0 and j > i:
+        return s[i : j + 1]
+    raise ValueError("no-json")
+
+
+def _build_prompt(
+    question_type: QuestionTypeLiteral,
+    topic: str,
+    difficulty: DifficultyLevel,
+    extra_params: Dict[str, Any] | None = None,
+) -> str:
+    # ... (Prompt logic is fine, keeping it same if possible, but tool requires chunk replacement)
+    # I will define _build_prompt in a separate tool call if this chunk is too big, 
+    # but currently I am replacing lines 42-401 roughly. The prompt logic was edited in previous turn.
+    # To be safe, I will NOT replace _build_prompt here.
+    # I will target lines 42-188 and 352-401 separately.
+    pass
+
+# THIS REPLACEMENT IS FOR LLM CALLS (lines 42-188)
+pass
 
 
 # --- Yardımcılar ------------------------------------------------------
@@ -182,11 +250,13 @@ def _build_prompt(
     """
     extra_params = extra_params or {}
     diff_str = difficulty.value
+    context = extra_params.get("context")
 
     base_instr = (
         "You are a quiz generator. Return ONLY one JSON object. "
         "Do NOT include explanations outside JSON. "
-        "Use Turkish for all human-readable texts."
+        "IMPORTANT: The entire content (stem, options, explanation, etc.) MUST be in TURKISH language. "
+        "Translate if necessary."
     )
 
     if question_type == "mcq":
@@ -197,7 +267,7 @@ def _build_prompt(
             "tags (array of strings), max_score (number)."
         )
         user = (
-            f"Generate a multiple choice question for topic '{topic}' "
+            f"Generate a multiple choice question in TURKISH for topic '{topic}' "
             f"with difficulty '{diff_str}'."
         )
 
@@ -209,7 +279,7 @@ def _build_prompt(
             "tags (array of strings), max_score (number)."
         )
         user = (
-            f"Generate a true/false question for topic '{topic}' "
+            f"Generate a true/false question in TURKISH for topic '{topic}' "
             f"with difficulty '{diff_str}'."
         )
 
@@ -222,7 +292,7 @@ def _build_prompt(
             "explanation (string), tags (array of strings), max_score (number)."
         )
         user = (
-            f"Generate a short answer question for topic '{topic}' "
+            f"Generate a short answer question in TURKISH for topic '{topic}' "
             f"with difficulty '{diff_str}'."
         )
 
@@ -234,7 +304,7 @@ def _build_prompt(
             "explanation (string, optional), tags (array of strings), max_score (number)."
         )
         user = (
-            f"Generate an open ended question for topic '{topic}' "
+            f"Generate an open ended question in TURKISH for topic '{topic}' "
             f"with difficulty '{diff_str}'."
         )
 
@@ -253,12 +323,64 @@ def _build_prompt(
             "- for 'open_ended': rubric (string)."
         )
         user = (
-            f"Generate a scenario-based multi-step question (2-3 steps) for topic '{topic}' "
+            f"Generate a scenario-based multi-step question (2-3 steps) in TURKISH for topic '{topic}' "
             f"with difficulty '{diff_str}'."
         )
 
     else:
         raise ValueError(f"Unsupported question_type: {question_type}")
+
+    difficulty_instruction = ""
+    if difficulty == DifficultyLevel.HARD:
+        if question_type == "mcq":
+            difficulty_instruction = (
+                "IMPORTANT: This is a HARD level question. "
+                "Do NOT ask simple recall questions. "
+                "Create a complex scenario or problem-solving situation. "
+                "The options should be very close to each other (distractors must be plausible). "
+                "Require deep understanding and analysis of the context."
+            )
+        elif question_type == "short_answer":
+            difficulty_instruction = (
+                "IMPORTANT: This is a HARD level question. "
+                "The question must describe a specific scenario, ritual, or distinct mechanism "
+                "(e.g., 'Daily Standup', 'Burn-down chart') that uniquely identifies the answer. "
+                "Do NOT ask generic definition questions like 'What is a methodology...'. "
+                "The answer must be the specific term for that mechanism. "
+                "Include common synonyms in 'accepted_answers'."
+            )
+        else:
+            difficulty_instruction = (
+                "IMPORTANT: This is a HARD level question. "
+                "Requires deep understanding and analysis. "
+                "Do NOT ask simple recall questions."
+            )
+
+    elif difficulty == DifficultyLevel.MEDIUM:
+        difficulty_instruction = (
+            "This is a MEDIUM level question. "
+            "Ask questions that require connecting concepts. "
+            "Avoid trivial facts."
+        )
+    else:
+        difficulty_instruction = "This is a BEGINNER level question. Focus on fundamental concepts."
+
+    if context:
+        user = (
+            f"CONTEXT:\n{context}\n\nUSER:\n{user}\n"
+            f"{difficulty_instruction}\n"
+            "Generate the question based EXCLUSIVELY on the CONTEXT provided above. "
+            "OUTPUT MUST BE IN TURKISH."
+        )
+    else:
+        # No context provided (Random generation or topic-based)
+        no_context_instruction = (
+            "You are generating a question based on your general knowledge. "
+            "Ensure the question follows the difficulty level precisely. "
+            "For HARD questions, use industry-standard scenarios (e.g., CISSP, PMP style) if applicable. "
+            "Do NOT ask generic definitions. OUTPUT MUST BE IN TURKISH."
+        )
+        user = f"{user}\n{difficulty_instruction}\n{no_context_instruction}"
 
     prompt = f"{base_instr}\n\n{schema_desc}\n\nUSER:\n{user}\n\nReturn ONLY JSON."
     return prompt
@@ -270,6 +392,7 @@ def _build_prompt(
 async def generate_question_from_llm(
     model_name: str,
     params: Dict[str, Any],
+    save: bool = True,
 ) -> QuestionModel:
     question_type: QuestionTypeLiteral = params.get("question_type", "mcq")
     input_topic: str = params.get("topic", "general")
@@ -289,34 +412,71 @@ async def generate_question_from_llm(
         extra_params=params,
     )
 
-    raw = _call_text_llm(model_name, prompt).strip()
-
+    usage = {}
+    is_success = False
+    
     try:
-        data = json.loads(_find_json(raw))
-    except Exception:
-        start = raw.find("{")
-        end = raw.rfind("}")
-        data = json.loads(raw[start : end + 1])
+        # Call LLM (now returns tuple)
+        raw, usage = _call_text_llm(model_name, prompt)
+        raw = raw.strip()
 
-    # JSON -> QuestionModel
-    q: QuestionModel = parse_llm_question_payload(data)
+        try:
+            data = json.loads(_find_json(raw))
+        except Exception:
+            # Fallback if _find_json fails or json.loads fails
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start < 0 or end < 0:
+                 raise ValueError("JSON not found in response")
+            data = json.loads(raw[start : end + 1])
 
-    # 🔴 BURASI KRİTİK: topic ve difficulty'yi input'a zorla
-    q.topic = input_topic
-    q.difficulty = difficulty
+        # JSON -> QuestionModel
+        q: QuestionModel = parse_llm_question_payload(data)
 
-    # Tag'leri zenginleştir: canonical topic her zaman tags içinde de olsun
-    if q.tags is None:
-        q.tags = []
-    if input_topic not in q.tags:
-        q.tags.insert(0, input_topic)
+        # 🔴 BURASI KRİTİK: topic ve difficulty'yi input'a zorla
+        q.topic = input_topic
+        q.difficulty = difficulty
 
-    # DB'ye kaydet
-    qid = add_question(q)
-    if hasattr(q, "id"):
-        q.id = qid
+        # Tag'leri zenginleştir: canonical topic her zaman tags içinde de olsun
+        if q.tags is None:
+            q.tags = []
+        if input_topic not in q.tags:
+            q.tags.insert(0, input_topic)
+            
+        # RAG Context injection
+        if "context" in params and isinstance(params["context"], str):
+             q.source_context = params["context"]
 
-    return q
+        # DB'ye kaydet
+        if save:
+            qid = add_question(q)
+            if hasattr(q, "id"):
+                q.id = qid
+        else:
+            # Dry run: fake ID
+            if hasattr(q, "id"):
+                q.id = 0
+
+        is_success = True
+        return q
+
+    except Exception as e:
+        print(f"[GEN ERROR] {e}")
+        raise e
+    
+    finally:
+        # Log stats regardless of success/failure
+        try:
+            add_llm_run(
+                model_name=model_name,
+                prompt_hash=None, # could hash prompt
+                latency_ms=usage.get("latency_ms", 0),
+                token_input=usage.get("token_input"),
+                token_output=usage.get("token_output"),
+                is_success=is_success
+            )
+        except Exception as log_err:
+            print(f"[LOG ERROR] {log_err}")
 
 
 

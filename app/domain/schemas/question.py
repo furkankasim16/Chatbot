@@ -81,6 +81,7 @@ class BaseQuestion(BaseModel):
     explanation: Optional[str] = None
     max_score: float = 1.0
     source_model: Optional[str] = None
+    source_context: Optional[str] = None # RAG context snippet
 
 # --- tek adımlılar (mcq / tf / short / open) ---
 

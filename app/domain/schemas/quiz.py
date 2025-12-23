@@ -29,3 +29,11 @@ class TimeEventIn(BaseModel):
     event_type: str
     ts: str
     meta_json: Optional[str] = None
+
+class RecentAttemptOut(BaseModel):
+    id: int
+    quiz_id: Optional[int] = None
+    user_id: Optional[int] = None
+    score: Optional[float] = None
+    status: Optional[str] = None
+    created_at: Optional[str] = None  # sqlite'dan iso string geliyorsa kolay

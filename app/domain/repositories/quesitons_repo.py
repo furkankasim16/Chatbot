@@ -165,9 +165,11 @@ def add_question(q: QuestionModel) -> int:
                 max_score,
                 total_score,
                 steps_json,
-                source_model
+
+                source_model,
+                source_context
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 q_hash,
@@ -185,6 +187,7 @@ def add_question(q: QuestionModel) -> int:
                 total_score,
                 steps_json,
                 getattr(q, "source_model", None) or "unknown",
+                getattr(q, "source_context", None),
             ),
         )
 
@@ -240,6 +243,7 @@ def _row_to_question_model(row) -> QuestionModel:
         total_score,
         steps_json,
         source_model,
+        source_context,
         review_status,
         review_notes,
         reviewed_by,
@@ -309,6 +313,7 @@ def _row_to_question_model(row) -> QuestionModel:
         explanation=explanation,
         max_score=max_score_val,
         source_model=source_model,
+        source_context=source_context,
     )
 
     # --- Tip bazlı mapping ---
@@ -448,6 +453,7 @@ def get_all_questions(limit: int = 100, offset: int = 0) -> List[QuestionModel]:
               total_score,
               steps_json,
               source_model,
+              source_context,
               review_status,
               review_notes,
               reviewed_by,
@@ -499,6 +505,7 @@ def get_random(
           total_score,
           steps_json,
           source_model,
+          source_context,
           review_status,
           review_notes,
           reviewed_by,
@@ -740,6 +747,7 @@ def update_question_in_db(
               total_score,
               steps_json,
               source_model,
+              source_context,
               review_status,
               review_notes,
               reviewed_by,

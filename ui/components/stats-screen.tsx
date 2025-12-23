@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import type { UserStats, QuizAttemptHistory } from "@/lib/api"
 import { getRecentAttempts } from "@/lib/api"
+import { UserAnalyticsDashboard } from "@/components/user-analytics-dashboard"
 
 interface StatsScreenProps {
   stats: UserStats
@@ -136,10 +137,10 @@ export function StatsScreen({ stats, token, onBack }: StatsScreenProps) {
               <p className="text-sm text-muted-foreground">
                 {stats.last_quiz_date
                   ? new Date(stats.last_quiz_date).toLocaleDateString("tr-TR", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
                   : "Henüz quiz çözülmedi"}
               </p>
             </div>
@@ -151,94 +152,53 @@ export function StatsScreen({ stats, token, onBack }: StatsScreenProps) {
       {(stats.total_quiz_duration_ms ||
         stats.avg_quiz_duration_ms ||
         stats.avg_question_duration_ms) && (
-        <Card className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Zaman İstatistikleri</h3>
-                <p className="text-sm text-muted-foreground">
-                  Quiz ve soru süreleriniz time modülünden alınmıştır.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Toplam Quiz Süresi</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {formatMsToMinSec(stats.total_quiz_duration_ms)}
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Ortalama Quiz Süresi</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {formatMsToMinSec(stats.avg_quiz_duration_ms)}
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Ortalama Soru Süresi</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {formatMsToMinSec(stats.avg_question_duration_ms)}
-                </p>
-                {typeof stats.total_questions_timed === "number" && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Ölçülen soru sayısı: {stats.total_questions_timed}
+          <Card className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Zaman İstatistikleri</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Quiz ve soru süreleriniz time modülünden alınmıştır.
                   </p>
-                )}
+                </div>
               </div>
-            </div>
-          </div>
-        </Card>
-      )}
 
-      {/* Konu bazlı performans */}
-      {stats.topic_stats && Object.keys(stats.topic_stats).length > 0 && (
-        <Card className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Award className="w-5 h-5 text-primary" />
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Toplam Quiz Süresi</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {formatMsToMinSec(stats.total_quiz_duration_ms)}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Ortalama Quiz Süresi</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {formatMsToMinSec(stats.avg_quiz_duration_ms)}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Ortalama Soru Süresi</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {formatMsToMinSec(stats.avg_question_duration_ms)}
+                  </p>
+                  {typeof stats.total_questions_timed === "number" && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ölçülen soru sayısı: {stats.total_questions_timed}
+                    </p>
+                  )}
+                </div>
               </div>
-              <h3 className="font-semibold text-foreground">Konu Bazlı Performans</h3>
             </div>
-            <div className="space-y-3">
-              {Object.entries(stats.topic_stats).map(([topic, topicStats]) => {
-                const topicAccuracy =
-                  topicStats.total > 0
-                    ? Math.round((topicStats.correct / topicStats.total) * 100)
-                    : 0
-                return (
-                  <div key={topic} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-foreground">
-                        {topic
-                          .split("_")
-                          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                          .join(" ")}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {topicStats.correct}/{topicStats.total} ({topicAccuracy}
-                        %)
-                      </span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-300"
-                        style={{ width: `${topicAccuracy}%` }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )}
+
+      {/* 📊 GELİŞMİŞ ANALİTİK DASHBOARD (Yeni) */}
+      <UserAnalyticsDashboard stats={stats} />
 
       {/* 🆕 Son quiz denemeleri */}
       <Card className="p-6">

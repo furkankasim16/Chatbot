@@ -11,12 +11,26 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30 * 24 * 60
+    DEBUG: bool = True
 
     OLLAMA_URL: AnyHttpUrl = "http://localhost:11434"
     OLLAMA_MODEL : str = "llama3:instruct"
-    GEMINI_API_KEY: str ="AIzaSyCs1NBKBimQyKQAzyStTseu9bAptUZkzz8"
-    GROQ_API_KEY : str  = "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"
+    OLLAMA_MODEL_TUTOR: Optional[str] = None
+    OLLAMA_MODEL_PLAYGROUND: Optional[str] = None
+    OLLAMA_MODEL_REVIEW: Optional[str] = None
+    
+    # .env dosyasından otomatik okunur
+    GEMINI_API_KEY: Optional[str] = None
+    GROQ_API_KEY: Optional[str] = None
     EMBED_MODEL: str = "intfloat/multilingual-e5-large"
+
+    # --- Redis & Queue ---
+    REDIS_URL: str = "redis://localhost:6379/0"
+    LLM_QUEUE_NAME: str = "llm"
+    LLM_QUEUE_MAX: int = 100
+    LLM_JOB_MAX_WAIT_SEC: int = 600
+    LLM_CALL_TIMEOUT_SEC: int = 300
+    LLM_RETRY_MAX: int = 1
 
     # ⬇️ TİP ANOTASYONU EKLENDİ (Path)
     QUESTIONS_DB_PATH: Path = resolve_db_path(os.getenv("QUESTIONS_DB_PATH") or QUESTIONS_DB)

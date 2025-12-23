@@ -48,6 +48,14 @@ CHAT_MODE_CONFIG: Dict[str, ChatModeConfig] = {
         max_history=6,
         description="Öğrenci cevabı geri bildirim ve puanlama modu",
     ),
+
+    # Yük Testi Modu (GPU kullanmaz)
+    "loadtest": ChatModeConfig(
+        provider="mock",
+        model="mock-v1",
+        max_history=2,
+        description="Yük testi için sahte LLM modu",
+    ),
 }
 
 

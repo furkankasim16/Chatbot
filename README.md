@@ -1,44 +1,58 @@
-# knowledge-bot
-## Kurulum
 
-### 1. Gereksinimler
-- Python 3.11+
-- Git
-- (Opsiyonel) Docker / Docker Compose
-- (Opsiyonel) Make (Linux/Mac, Windows’ta gerekmez)
+# 🧠 AI-Powered Quiz Bot
 
----
+Yapay zeka tabanlı, kişiselleştirilmiş bir eğitim ve değerlendirme asistanı.
 
-### 2. Sanal ortam (Windows PowerShell)
+## 🚀 Özellikler
 
-   powershell
-# Proje klasörüne gir
-cd chatbot
+- **🤖 AI Soru Üretimi:** Llama 3, Phi-3 ve GPT modelleri ile otomatik soru oluşturma.
+- **📚 RAG (Doküman Tabanlı Öğrenme):** PDF yükleyip kendi içeriklerinizden soru türetme.
+- **🎯 Rubric Değerlendirme:** Açık uçlu sorular için detaylı, kriter bazlı puanlama.
+- **🛡️ Güvenlik (Guardrails):** Hassas verileri (PII) otomatik maskeleme.
+- **📊 Gelişmiş Analitik:** Kullanıcı performansını ve konu bazlı eksikleri görselleştirme.
+- **💡 Akıllı Öneriler:** Başarısız olunan konuları tespit edip çalışma önerileri sunma.
 
-# Sanal ortam oluştur
-python -m venv .venv
+## 🛠️ Kurulum
 
-# Aktivasyon
-.venv\Scripts\Activate.ps1
+### 1. Ön Gereksinimler
+- **Docker** ve **Docker Compose** yüklü olmalı.
+- (Opsiyonel) **Ollama** lokalde çalışıyor olmalı (LLM için).
 
-# Eğer hata alırsan (script policy):
-# PowerShell'i Administrator olarak aç ve çalıştır:
-# Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-Linux/Mac için:
-python3 -m venv .venv
-source .venv/bin/activate
-
-pip install --upgrade pip
-pip install fastapi uvicorn[standard] pytest httpx python-dotenv pydantic-settings
-
-### 3.Çalıştırma
-    python -m uvicorn src.app:app --reload --host 0.0.0.0 --port 8000
-    http://localhost:8000/docs  (Tarayıcıdan kontrol edin)
-
-    
+### 2. Çalıştırma
+Projeyi indirdikten sonra ana dizinde terminali açın ve şu komutu çalıştırın:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r <yoksa doğrudan pip ile yukarıdaki paketler>
-make dev
-# http://localhost:8000/health
+docker-compose up --build
+```
+Bu işlem ilk seferde birkaç dakika sürebilir.
+
+### 3. Erişim
+- **Frontend (Arayüz):** [http://localhost:3000](http://localhost:3000)
+- **Backend (API):** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ChromaDB:** [http://localhost:8008](http://localhost:8008)
+
+## 📂 Proje Yapısı
+
+- `app/`: Python (FastAPI) backend kodları.
+- `ui/`: Next.js frontend kodları.
+- `app/data/`: SQLite veritabanı ve yüklenen PDF'ler burada saklanır.
+
+## 🧪 Geliştirme Modu (Lokal)
+
+Eğer Docker kullanmadan geliştirmek isterseniz:
+
+**Backend:**
+```bash
+poetry install
+poetry run uvicorn app.main:app --reload
+```
+
+**Frontend:**
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+---
+*Geliştirici: Furkan Talha KASIM*

@@ -7,16 +7,17 @@ import { AlertCircle } from "lucide-react"
 import { fetchLlmStatsSummary } from "@/lib/api"
 import type { LlmStatsSummary } from "@/app/types/llm"
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  Legend,
 } from "recharts"
 
-export function LlmPerformanceChart() {
+export function LlmPerformanceChart({ token }: { token: string }) {
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,13 +30,17 @@ export function LlmPerformanceChart() {
       setError(null)
 
       try {
-        const stats = await fetchLlmStatsSummary()
+        const stats = await fetchLlmStatsSummary(token)
         if (cancelled) return
 
         const chartData = (stats as LlmStatsSummary[]).map((s) => {
           const anyS = s as any
+          let rawName = anyS.model ?? anyS.model_name ?? "Model"
+          // Prefix cleaning for better display
+          rawName = rawName.replace("ollama:", "").replace("openai:", "")
+
           return {
-            name: anyS.model ?? anyS.model_name ?? "Model",
+            name: rawName,
             avgLatency: anyS.avg_latency_ms ?? anyS.avg_ms ?? 0,
             successRate:
               anyS.success_rate != null
@@ -91,29 +96,40 @@ export function LlmPerformanceChart() {
       )}
 
       {!isLoading && !error && data.length > 0 && (
-        <div className="h-64">
+        <div className="h-[350px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
+            <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis dataKey="name" />
+              <XAxis
+                dataKey="name"
+                interval={0}
+                angle={-30}
+                textAnchor="end"
+                height={60}
+                tick={{ fontSize: 12 }}
+              />
               <YAxis yAxisId="left" />
               <YAxis yAxisId="right" orientation="right" />
-              <Tooltip />
-              <Line
+              <Tooltip
+                contentStyle={{ backgroundColor: "#1f2937", borderColor: "#374151" }}
+                itemStyle={{ color: "#f3f4f6" }}
+              />
+              <Legend />
+              <Bar
                 yAxisId="left"
-                type="monotone"
                 dataKey="avgLatency"
                 name="Ort. Süre (ms)"
-                dot={false}
+                fill="#3b82f6"
+                radius={[4, 4, 0, 0]}
               />
-              <Line
+              <Bar
                 yAxisId="right"
-                type="monotone"
                 dataKey="successRate"
                 name="Başarı Oranı (%)"
-                dot={false}
+                fill="#10b981"
+                radius={[4, 4, 0, 0]}
               />
-            </LineChart>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       )}

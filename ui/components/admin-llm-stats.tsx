@@ -8,7 +8,7 @@ import { AlertCircle, Brain } from "lucide-react"
 import { fetchLlmStatsSummary } from "@/lib/api"
 import type { LlmStatsSummary } from "@/app/types/llm"
 
-export function AdminLlmStats() {
+export function AdminLlmStats({ token }: { token: string }) {
   const [stats, setStats] = useState<LlmStatsSummary[] | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -21,7 +21,7 @@ export function AdminLlmStats() {
       setError(null)
 
       try {
-        const data = await fetchLlmStatsSummary()
+        const data = await fetchLlmStatsSummary(token)
         if (cancelled) return
         setStats(data)
       } catch (err) {

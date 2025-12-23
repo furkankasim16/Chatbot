@@ -94,36 +94,36 @@ export function QuizInterface({
   const currentStepAnswer: string = scenarioAnswers[currentStep] || ""
 
   const normalizeStepType = (val: any): QuestionType | null => {
-  if (!val) return null
-  const s = String(val).toLowerCase().replace(/[-_\s]/g, "")
+    if (!val) return null
+    const s = String(val).toLowerCase().replace(/[-_\s]/g, "")
 
-  // step seviyesinde geçerli tipler:
-  if (["truefalse", "tf", "dogruyanlis", "dogruyanlıs"].includes(s)) {
-    return "true_false"
+    // step seviyesinde geçerli tipler:
+    if (["truefalse", "tf", "dogruyanlis", "dogruyanlıs"].includes(s)) {
+      return "true_false"
+    }
+
+    if (["short", "kisa", "kisacevap", "kısacevap", "shortanswer"].includes(s)) {
+      return "short_answer"
+    }
+
+    if (["open", "openended", "acikuclu", "açıkuçlu", "acik", "açık"].includes(s)) {
+      return "open_ended"
+    }
+
+    if (["mcq", "coktansecmeli", "çoktansecmeli", "coktansec"].includes(s)) {
+      return "mcq"
+    }
+
+    // "scenario" dahil bilmediğin her şey → null (textarea)
+    return null
   }
-
-  if (["short", "kisa", "kisacevap", "kısacevap", "shortanswer"].includes(s)) {
-    return "short_answer"
-  }
-
-  if (["open", "openended", "acikuclu", "açıkuçlu", "acik", "açık"].includes(s)) {
-    return "open_ended"
-  }
-
-  if (["mcq", "coktansecmeli", "çoktansecmeli", "coktansec"].includes(s)) {
-    return "mcq"
-  }
-
-  // "scenario" dahil bilmediğin her şey → null (textarea)
-  return null
-}
 
 
   const stepType: QuestionType | null = normalizeStepType(
     currentStepObj.step_type ?? currentStepObj.type,
   )
   const stepOptions: string[] = currentStepObj.options ?? []
-   const stepSelectedIndex = stepOptions.findIndex(
+  const stepSelectedIndex = stepOptions.findIndex(
     (opt) => opt === currentStepAnswer,
   )
   const stepSelectedValue =
@@ -175,23 +175,23 @@ export function QuizInterface({
 
   const typeLabel =
     qtype === "mcq"
-      ? "Multiple Choice"
+      ? "Çoktan Seçmeli"
       : qtype === "true_false"
-      ? "True / False"
-      : qtype === "open_ended"
-      ? "Open Ended"
-      : qtype === "short_answer"
-      ? "Short Answer"
-      : "Scenario"
+        ? "Doğru / Yanlış"
+        : qtype === "open_ended"
+          ? "Açık Uçlu"
+          : qtype === "short_answer"
+            ? "Kısa Cevap"
+            : "Senaryo"
 
   return (
     <div className="animate-fade-in space-y-6">
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
-            Question {questionNumber} of {totalQuestions}
+            Soru {questionNumber} / {totalQuestions}
           </span>
-          <span>{Math.round(progress)}% Complete</span>
+          <span>%{Math.round(progress)} Tamamlandı</span>
         </div>
         <Progress value={progress} className="h-2" />
       </div>
@@ -223,7 +223,7 @@ export function QuizInterface({
                 value={
                   effectiveSelected != null ? String(effectiveSelected) : ""
                 }
-                onValueChange={(val : string) => {
+                onValueChange={(val: string) => {
                   const idx = parseInt(val)
                   if (!isNaN(idx)) setEffectiveSelected(idx)
                 }}
@@ -270,13 +270,13 @@ export function QuizInterface({
             {(qtype === "short_answer" || qtype === "open_ended") && (
               <div className="space-y-2">
                 <Label htmlFor="answer" className="text-sm font-medium">
-                  Your Answer
+                  Cevabınız
                 </Label>
                 <Textarea
                   id="answer"
                   value={textAnswer}
                   onChange={(e) => setTextAnswer(e.target.value)}
-                  placeholder="Type your answer here..."
+                  placeholder="Cevabını buraya yaz..."
                   className={qtype === "open_ended" ? "min-h-40" : "min-h-24"}
                 />
               </div>
@@ -288,7 +288,7 @@ export function QuizInterface({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                  Scenario - Step {currentStep} of{" "}
+                  Senaryo - Adım {currentStep} /{" "}
                   {hasSteps ? steps!.length : 1}
                 </div>
 
@@ -314,7 +314,7 @@ export function QuizInterface({
               {hasSteps && (
                 <div className="p-4 rounded-lg bg-muted/50 border">
                   <p className="text-sm font-medium mb-2">
-                    Step {currentStep}
+                    Adım {currentStep}
                     {stepType ? ` (${stepType})` : ""}
                   </p>
                   <p className="text-base whitespace-pre-line">
@@ -326,44 +326,44 @@ export function QuizInterface({
               {/* Step'e göre input tipi */}
 
               {/* MCQ step */}
-                {stepType === "mcq" && stepOptions.length > 0 && (
-                  <RadioGroup
-                    value={stepSelectedValue}
-                    onValueChange={(val: string) => {
-                      const idx = parseInt(val)
-                      const chosen = !isNaN(idx) ? stepOptions[idx] : ""
-                      setScenarioAnswers((prev) => ({
-                        ...prev,
-                        [currentStep]: chosen,
-                      }))
-                    }}
-                    className="space-y-3"
-                  >
-                    {stepOptions.map((opt, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start space-x-3 p-4 rounded-lg border hover:bg-muted/50 cursor-pointer"
-                        onClick={() =>
-                          setScenarioAnswers((prev) => ({
-                            ...prev,
-                            [currentStep]: stepOptions[index] ?? "",
-                          }))
-                        }
+              {stepType === "mcq" && stepOptions.length > 0 && (
+                <RadioGroup
+                  value={stepSelectedValue}
+                  onValueChange={(val: string) => {
+                    const idx = parseInt(val)
+                    const chosen = !isNaN(idx) ? stepOptions[idx] : ""
+                    setScenarioAnswers((prev) => ({
+                      ...prev,
+                      [currentStep]: chosen,
+                    }))
+                  }}
+                  className="space-y-3"
+                >
+                  {stepOptions.map((opt, index) => (
+                    <div
+                      key={index}
+                      className="flex items-start space-x-3 p-4 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                      onClick={() =>
+                        setScenarioAnswers((prev) => ({
+                          ...prev,
+                          [currentStep]: stepOptions[index] ?? "",
+                        }))
+                      }
+                    >
+                      <RadioGroupItem
+                        value={String(index)}
+                        id={`step-${currentStep}-opt-${index}`}
+                      />
+                      <Label
+                        htmlFor={`step-${currentStep}-opt-${index}`}
+                        className="flex-1 cursor-pointer"
                       >
-                        <RadioGroupItem
-                          value={String(index)}
-                          id={`step-${currentStep}-opt-${index}`}
-                        />
-                        <Label
-                          htmlFor={`step-${currentStep}-opt-${index}`}
-                          className="flex-1 cursor-pointer"
-                        >
-                          {opt}
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                )}
+                        {opt}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              )}
 
               {/* True / False step */}
               {stepType === "true_false" && (
@@ -407,18 +407,18 @@ export function QuizInterface({
               {(stepType === "short_answer" ||
                 stepType === "open_ended" ||
                 stepType === null) && (
-                <Textarea
-                  value={currentStepAnswer}
-                  onChange={(e) =>
-                    setScenarioAnswers((prev) => ({
-                      ...prev,
-                      [currentStep]: e.target.value,
-                    }))
-                  }
-                  placeholder="Describe your approach for this step..."
-                  className="min-h-32"
-                />
-              )}
+                  <Textarea
+                    value={currentStepAnswer}
+                    onChange={(e) =>
+                      setScenarioAnswers((prev) => ({
+                        ...prev,
+                        [currentStep]: e.target.value,
+                      }))
+                    }
+                    placeholder="Bu adım için yaklaşımını açıkla..."
+                    className="min-h-32"
+                  />
+                )}
             </div>
           </>
         )}
@@ -437,9 +437,9 @@ export function QuizInterface({
           ) : qtype === "scenario" &&
             hasSteps &&
             currentStep < (steps?.length || 1) ? (
-            "Next Step"
+            "Sonraki Adım"
           ) : (
-            "Submit Answer"
+            "Cevabı Gönder"
           )}
         </Button>
       </Card>

@@ -1,14 +1,15 @@
 # app/api/routers/chat.py
 
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.api.deps import get_current_user
-from app.domain.schemas.chat import ChatTurnRequest, ChatTurnResponse
+from app.domain.schemas.chat import ChatTurnRequest, ChatTurnResponse, ChatJobResponse
 from app.domain.services.chat_llm import ChatLlmError
-from app.domain.services.chat_service import handle_chat_turn
+from app.domain.services.chat_service import handle_fast_turn
+from app.infra.queue.enqueue import enqueue_chat_job, get_job_status, QueueFullError
 from app.domain.services.evaluate_service import chat_with_context
 from app.domain.services.rag_service import index_folder, clear_collection
 from app.core.paths import CORPUS_DIR
@@ -63,7 +64,7 @@ def list_chat_modes():
     return out
 
 
-@router.post("/turn", response_model=ChatTurnResponse)
+@router.post("/turn", response_model=Union[ChatTurnResponse, ChatJobResponse])
 async def chat_turn(
     data: ChatTurnRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -76,12 +77,49 @@ async def chat_turn(
 
     user_id = current_user.get("id") or current_user.get("user_id")
 
+    # 1. Hızlı yanıt kontrolü (LLM bypass)
     try:
-        resp = await handle_chat_turn(data, user_id=user_id)
-        return resp
-    except ChatLlmError as e:
-        # LLM kaynaklı hataları 502 ile dön
+        fast_resp = await handle_fast_turn(data)
+        if fast_resp:
+            return fast_resp
+    except Exception as e:
+        # Hızlı yolda hata olursa logla, ama main flow bozulmasın diye devam edebilirsin
+        # veya direkt hata dönebilirsin. Şimdilik raise.
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # 2. Kuyruğa ekle (Slow Path)
+    try:
+        # Request verisini dict'e çevirip kuyruğa atıyoruz
+        job_id = enqueue_chat_job(data.model_dump(), user_id=user_id)
+        return ChatJobResponse(job_id=job_id, status="queued")
+
+    except QueueFullError:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(e),
+            status_code=429,
+            detail="System is currently overloaded. Please try again later.",
         )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Queue error: {str(e)}",
+        )
+
+
+@router.get("/result/{job_id}", response_model=ChatJobResponse)
+def get_turn_result(job_id: str):
+    """
+    Job durumunu ve varsa sonucunu döner.
+    """
+    status_data = get_job_status(job_id)
+    
+    # Status data: {status, result, error, waited_ms}
+    # Eğer result varsa, içinde ChatTurnResponse dict'i var demektir.
+    
+    # status_data'yı ChatJobResponse modeline map etmeliyiz
+    return ChatJobResponse(
+        job_id=job_id,
+        status=status_data.get("status", "not_found"),
+        result=status_data.get("result"), # Pydantic otomatik parse eder
+        waited_ms=status_data.get("waited_ms"),
+        error=status_data.get("error")
+    )
