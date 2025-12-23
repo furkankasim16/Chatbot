@@ -12,14 +12,44 @@ Yapay zeka tabanlı, kişiselleştirilmiş bir eğitim ve değerlendirme asistan
 - **📊 Gelişmiş Analitik:** Kullanıcı performansını ve konu bazlı eksikleri görselleştirme.
 - **💡 Akıllı Öneriler:** Başarısız olunan konuları tespit edip çalışma önerileri sunma.
 
-## 🛠️ Kurulum
+## 🛠️ Kurulum Öncesi Gereksinimler
 
-### 1. Ön Gereksinimler
-- **Docker** ve **Docker Compose** yüklü olmalı.
-- (Opsiyonel) **Ollama** lokalde çalışıyor olmalı (LLM için).
+Projeyi çalıştırmadan önce aşağıdaki araçların kurulu olduğundan emin olun:
+- **Docker & Docker Compose**
+- **Ollama** (Yerel LLM için)
 
-### 2. Çalıştırma
-Projeyi indirdikten sonra ana dizinde terminali açın ve şu komutu çalıştırın:
+Ayrıca aşağıdaki **Ollama modellerini** indirmeniz **ZORUNLUDUR**:
+```bash
+ollama pull llama3:instruct
+ollama pull intfloat/multilingual-e5-large
+```
+
+---
+
+## 🚀 Hızlı Başlangıç (Docker ile)
+
+1. **Repoyu Klonlayın:**
+   ```bash
+   git clone https://github.com/furkankasim16/Chatbot.git
+   cd Chatbot
+   ```
+
+2. **Çevresel Değişkenleri Ayarlayın (.env):**
+   Ana dizinde `.env` adında bir dosya oluşturun ve aşağıdaki ayarları ekleyin. (Eğer `env.example` varsa kopyalayabilirsiniz):
+   
+   ```ini
+   # --- LLM Ayarları (Zorunlu) ---
+   # Docker içinden host'taki Ollama'ya erişmek için:
+   OLLAMA_BASE_URL=http://host.docker.internal:11434
+   EMBED_MODEL=intfloat/multilingual-e5-large
+
+   # --- Cloud API Anahtarları (Opsiyonel) ---
+   # Eğer yerel LLM yerine bunları kullanmak isterseniz:
+   GEMINI_API_KEY=AIzaSy...
+   GROQ_API_KEY=gsk_...
+   ```
+
+3. **Uygulamayı Başlatın:**
 
 ```bash
 docker-compose up --build
