@@ -26,14 +26,20 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     username: str
     is_admin: bool
+    xp: int = 0
+    level: int = 1
 
 class UserStats(BaseModel):
-    id: int # 🆕 Add ID
+    id: int
     total_quizzes: int
     total_questions: int
     correct_answers: int
-    last_quiz_date: Optional[str]  # ISO string veya None
+    last_quiz_date: Optional[str]
     topic_stats: Dict[str, Dict[str, int]]
+    
+    # User Profile Data
+    xp: int = 0
+    level: int = 1
 
     # ⏱️ Quiz bazlı süreler (ms cinsinden)
     total_quiz_duration_ms: int = 0
@@ -46,7 +52,6 @@ class UserStats(BaseModel):
     avg_question_duration_ms: float = 0.0
     recommended_study_topics: List[str] = []
 
-
 # ---------- Auth helpers ----------
 import logging
 logger = logging.getLogger("app.auth")
@@ -54,7 +59,7 @@ logger = logging.getLogger("app.auth")
 def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
     with app_cursor() as c:
         row = c.execute(
-            "SELECT id, username, hashed_password, is_admin FROM users WHERE username=?",
+            "SELECT id, username, hashed_password, is_admin, xp, level FROM users WHERE username=?",
             (username,),
         ).fetchone()
     if not row:
@@ -65,7 +70,13 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
         return None
     
     logger.info(f"User '{username}' logged in successfully.")
-    return {"id": row["id"], "username": row["username"], "is_admin": bool(row["is_admin"])}
+    return {
+        "id": row["id"], 
+        "username": row["username"], 
+        "is_admin": bool(row["is_admin"]),
+        "xp": row["xp"] or 0,
+        "level": row["level"] or 1
+    }
 
 @router.get("/me")
 def me(current=Depends(get_current_user)):
@@ -85,11 +96,16 @@ def login(form: OAuth2PasswordRequestForm = Depends()):
         "token_type": "bearer",
         "username": user["username"],
         "is_admin": user["is_admin"],
+        "xp": user["xp"],
+        "level": user["level"],
     }
 
 @router.get("/stats", response_model=UserStats, dependencies=[Depends(on_start_app_db)])
 def user_stats(current=Depends(get_current_user)):
     user_id = current["id"]
+    current_xp = current["xp"]
+    current_level = current["level"]
+
     with app_cursor() as c:
         # 1) Toplam quiz, toplam sorular, toplam doğru, son tarih (mevcut mantık)
         tq = c.execute(
@@ -174,7 +190,9 @@ def user_stats(current=Depends(get_current_user)):
          recommendations = ["Tebrikler! Tüm konularda performansın iyi.", "Zorluğu artırmayı dene."]
 
     return {
-        "id": user_id, # 🆕 Return ID
+        "id": user_id, 
+        "xp": current_xp,
+        "level": current_level,
         "total_quizzes": int(tq[0]),
         "total_questions": int(tq[1]),
         "correct_answers": int(tq[2]),

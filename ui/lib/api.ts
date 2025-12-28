@@ -128,6 +128,8 @@ export interface UserStats {
   total_question_duration_ms: number
   avg_question_duration_ms: number
   recommended_study_topics: string[]
+  xp: number
+  level: number
 }
 
 export interface QuizResult {

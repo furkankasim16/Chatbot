@@ -58,7 +58,7 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
       return
     }
     if (selectedMode) {
-      onStartQuiz({ mode: selectedMode, topic, difficulty, useOllama })
+      onStartQuiz({ mode: selectedMode, topic, difficulty, useOllama: false })
     }
   }
 
@@ -76,13 +76,6 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
       description: "One question per day to stay sharp",
       icon: Calendar,
       color: "bg-accent",
-    },
-    {
-      id: "scenario" as QuizMode,
-      title: "Scenario Task",
-      description: "Multi-step real-world scenarios",
-      icon: GitBranch,
-      color: "bg-secondary",
     },
   ]
 
@@ -109,7 +102,7 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
         <p className="text-muted-foreground text-lg">Bir quiz modu seç ve öğrenme deneyimini özelleştir</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 max-w-4xl mx-auto">
         {modes.map((mode) => {
           const Icon = mode.icon
           const isSelected = selectedMode === mode.id
@@ -222,24 +215,7 @@ export function HomeScreen({ onStartQuiz, onChatMode }: HomeScreenProps) {
             </div>
           </div>
 
-          <div className="flex items-start space-x-3 p-4 rounded-lg border border-border bg-muted/30">
-            <Checkbox
-              id="use-ollama"
-              checked={useOllama}
-              onCheckedChange={(checked) => setUseOllama(checked === true)}
-            />
-            <div className="space-y-1 flex-1">
-              <Label htmlFor="use-ollama" className="flex items-center gap-2 cursor-pointer font-medium">
-                <Sparkles className="w-4 h-4 text-primary" />
-                Ollama ile Dinamik Soru Üret
-              </Label>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {useOllama
-                  ? "⚠️ Soru üretimi 20-30 saniye sürebilir. Veritabanından çekmek için kapatın."
-                  : "Veritabanından hazır sorular çekilecek (hızlı). Yeni sorular üretmek için aktif edin."}
-              </p>
-            </div>
-          </div>
+
 
           <Button
             onClick={handleStart}

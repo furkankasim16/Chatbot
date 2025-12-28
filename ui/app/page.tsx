@@ -147,6 +147,8 @@ export default function QuizWidget() {
     try {
       const stats = await getUserStats(token)
       setUserStats(stats)
+      // Sync user state with fresh stats
+      setUser(prev => prev ? ({ ...prev, xp: stats.xp, level: stats.level }) : null)
     } catch (error) {
       console.error("[v0] Failed to load user stats (using default 0s):", error)
       // Fallback to empty stats so screen renders

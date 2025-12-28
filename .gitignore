@@ -29,3 +29,14 @@ ui/.next/
 
 # Large Model Files
 *.gguf
+
+# RAG & User Data
+app/data/corpus/*
+!app/data/corpus/.gitkeep
+app/storage/
+
+# Legacy & Temp Files
+chroma_db/
+questions.db
+*.txt
+
