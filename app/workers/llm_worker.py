@@ -9,12 +9,17 @@ from rq import SimpleWorker, Queue
 from app.infra.queue.redis_conn import redis_conn
 from app.core.config import settings
 
+import logging
+# Configure worker logger
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s")
+logger = logging.getLogger("app.worker")
+
 def start_worker():
     listen = [settings.LLM_QUEUE_NAME]
     
-    print(f"🚀 Worker starting... Listening on: {listen}")
-    print(f"Redis: {settings.REDIS_URL}")
-    print("ℹ️  Running in WINDOWS mode (SimpleWorker)")
+    logger.info(f"🚀 Worker starting... Listening on: {listen}")
+    logger.info(f"Redis: {settings.REDIS_URL}")
+    logger.info("ℹ️  Running in WINDOWS mode (SimpleWorker)")
 
     # Explicitly pass connection to Queues
     queues = [Queue(name, connection=redis_conn) for name in listen]

@@ -68,6 +68,8 @@ api_v1.include_router(admin_router, tags=["admin"])
 api_v1.include_router(admin_quiz_router)
 api_v1.include_router(kb_router)
 api_v1.include_router(rag_router)
+from app.api.routers.reports import router as reports_router
+api_v1.include_router(reports_router)
 app.include_router(api_v1)
 
 def _bump_once(db_path, init_fn, target_version: int = 1):

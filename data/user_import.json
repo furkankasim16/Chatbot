@@ -1,0 +1,68 @@
+[
+    {
+        "question_type": "scenario",
+        "topic": "security_policy",
+        "difficulty": "hard",
+        "stem": "SENARYO: Bir şirket çalışanı, kendisine BT departmanından gelmiş gibi görünen bir e-posta alır. E-postada 'Sistem güncellemesi için şifrenizi aşağıdaki bağlantıya girerek onaylayın' denilmektedir. Çalışan bağlantıya tıklar ve şifresini girer. 10 dakika sonra sistem yöneticisi olağandışı bir giriş fark eder.\n\n SORU: Bu olayda ihlal edilen temel güvenlik politikası prensibi nedir ve acil müdahale adımı ne olmalıdır?",
+        "scenario": "Phishing (Oltalama) saldırısı sonrası hesap ele geçirme durumu.",
+        "correct_answer_json": "İhlal edilen prensip 'Sosyal Mühendislik Farkındalığı'dır. İlk adım ilgili hesabın derhal dondurulması ve aktif oturumların sonlandırılmasıdır.",
+        "explanation": "Security Awareness (Güvenlik Farkındalığı) politikaları personelin bu tür linklere tıklamamasını gerektirir. Müdahale ise yanal hareketi engellemek için kimlik bilgisi sıfırlamayı kapsar.",
+        "source_context": "NIST SP 800-61 Rev. 2 (Computer Security Incident Handling Guide)"
+    },
+    {
+        "question_type": "mcq",
+        "topic": "product_basics",
+        "difficulty": "medium",
+        "stem": "Bir ürünün 'Churn Rate' (Müşteri Kayıp Oranı) %10'dan %2'ye düştüğünde aşağıdakilerden hangisi doğrudan gerçekleşmiş olur?",
+        "options_json": [
+            "A) Müşteri Yaşam Boyu Değeri (LTV) artar.",
+            "B) Ürün geliştirme maliyeti (R&D) azalır.",
+            "C) Şirketin toplam hisse değeri düşer.",
+            "D) Müşteri Edinme Maliyeti (CAC) yükselir."
+        ],
+        "correct_answer_json": "0",
+        "explanation": "Churn oranının düşmesi, müşterilerin ürünle daha uzun süre kalması demektir. Bu da her bir müşteriden elde edilen toplam geliri (LTV) doğrudan artırır.",
+        "source_context": "SaaS Metrics Guide: Understanding LTV and Churn"
+    },
+    {
+        "question_type": "true_false",
+        "topic": "support_flow",
+        "difficulty": "easy",
+        "stem": "Destek süreçlerinde 'First Response Time' (FRT), bir müşteriye sorununun çözüldüğüne dair gönderilen son mesajın süresini ifade eder.",
+        "options_json": [
+            "Doğru",
+            "Yanlış"
+        ],
+        "correct_answer_json": "1",
+        "explanation": "FRT (İlk Yanıt Süresi), müşterinin talebi açtığı an ile bir temsilcinin ona ilk kez cevap verdiği an arasındaki süredir; çözüm süresi (Resolution Time) ile karıştırılmamalıdır.",
+        "source_context": "Zendesk Support Performance Metrics Standards"
+    },
+    {
+        "question_type": "short_answer",
+        "topic": "security_policy",
+        "difficulty": "medium",
+        "stem": "Veri koruma politikalarında, 'yetkisiz erişimi engellemek için verinin okunamaz hale getirilmesi' işlemine ne ad verilir?",
+        "correct_answer_json": "Şifreleme (Encryption)",
+        "explanation": "Encryption, veriyi bir anahtar yardımıyla anlaşılmaz bir formata dönüştürerek gizliliği sağlar.",
+        "source_context": "ISO/IEC 27001 - Information Security Management"
+    },
+    {
+        "question_type": "open_ended",
+        "topic": "product_basics",
+        "difficulty": "hard",
+        "stem": "Bir 'SaaS' ürününde 'Product-Led Growth' (Ürün Odaklı Büyüme) stratejisinin temel mantığını ve satış odaklı büyümeden farkını açıklayınız.",
+        "correct_answer_json": "PLG stratejisinde temel büyüme motoru ürünün kendisidir. Kullanıcı ürünü dener (freemium/trial), değerini görür ve kendi kendine satın alma kararını verir. Satış odaklı modelde ise süreç satış temsilcilerinin iknası ve demoları üzerinden yürür.",
+        "explanation": "PLG'de ürünün onboarding süreci ve kullanıcı deneyimi (UX) en kritik başarı faktörüdür.",
+        "source_context": "Product-Led Growth: How to Build a Product That Sells Itself by Wes Bush"
+    },
+    {
+        "question_type": "scenario",
+        "topic": "support_flow",
+        "difficulty": "medium",
+        "stem": "SENARYO: Bir müşteri, aldığı hizmetin SLA (Service Level Agreement) süresinin dolmasına rağmen yanıt alamadığını belirterek Twitter üzerinden şikayette bulunuyor. \n\n SORU: Destek akışına göre (Support Flow) bu durumda 'Escalation' (Üst Mercie İletme) süreci nasıl işlemelidir?",
+        "scenario": "SLA ihlali ve sosyal medya krizi yönetimi.",
+        "correct_answer_json": "Talep 'Critical/High' öncelik seviyesine yükseltilmeli (Priority Escalation) ve hem teknik destek yöneticisine hem de halkla ilişkiler birimine eş zamanlı bilgi verilmelidir.",
+        "explanation": "SLA aşımı operasyonel bir hatadır; sosyal medya faktörü ise marka imajını etkilediği için sürece iletişim birimlerinin dahil edilmesini gerektirir.",
+        "source_context": "ITIL 4 Incident and Service Request Management"
+    }
+]

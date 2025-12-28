@@ -19,3 +19,5 @@ class UserOut(BaseModel):
     username: str
     email: EmailStr
     is_admin: bool
+    xp: int = 0
+    level: int = 1

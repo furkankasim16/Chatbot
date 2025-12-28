@@ -21,3 +21,5 @@ echo   TUM SERVISLER BASLATILDI!
 echo   Pencereleri kapatarak servisleri durdurabilirsiniz.
 echo ===================================================
 timeout /t 5
+
+

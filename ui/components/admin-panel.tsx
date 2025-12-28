@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +30,8 @@ import {
   deleteQuestion,
   type Question,
   generateQuestionFromPdf,
+  getAvailableModels,
+  type LlmModelInfo,
 } from "@/lib/api"
 import { UserActivityTable } from "@/components/user-activity-table"
 import { AuditLogsTable } from "@/components/audit-logs-table"
@@ -62,6 +64,30 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
 
   // ⭐ LLM MODEL SEÇİMİ
   const [llmModel, setLlmModel] = useState<string>("ollama:llama3")
+  const [allModels, setAllModels] = useState<LlmModelInfo[]>([])
+  const [isLoadingModels, setIsLoadingModels] = useState(false)
+
+  useEffect(() => {
+    setIsLoadingModels(true)
+    getAvailableModels()
+      .then((models) => {
+        setAllModels(models)
+        // If current selection is not in list and list has items, default to first item
+        // But be careful not to override if it's already a valid choice or user preference
+        if (models.length > 0 && !models.some(m => m.id === llmModel)) {
+          // Forcing default might be annoying if "ollama:llama3" is valid but just named differently
+          // But for now let's default to the first one if current is not found?
+          // Or better, just keep current but show options.
+          // Actually, if list is loaded, we should probably set to first if current is empty/invalid.
+          // But "ollama:llama3" is the hardcoded default state.
+          if (models.length > 0) {
+            setLlmModel(models[0].id)
+          }
+        }
+      })
+      .catch((err) => console.error("Model fetch error:", err))
+      .finally(() => setIsLoadingModels(false))
+  }, [])
 
   // ⭐ PDF'ten soru üretme durumları
   const [pdfFile, setPdfFile] = useState<File | null>(null)
@@ -277,18 +303,19 @@ export function AdminPanel({ token, onBack }: AdminPanelProps) {
                   <SelectValue placeholder="Model seçin" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ollama:llama3:instruct">Ollama - Llama 3 (Instruct)</SelectItem>
-                  <SelectItem value="ollama:phi3:medium">Ollama - Phi-3 Medium</SelectItem>
-                  <SelectItem value="ollama:gpt-oss:20b">Ollama - GPT-OSS 20B (Local)</SelectItem>
-                  <SelectItem value="ollama:mistral:latest">Ollama - Mistral</SelectItem>
-                  <SelectItem value="ollama:gpt-oss:120b-cloud">Ollama - GPT-OSS 120B (Cloud)</SelectItem>
-                  <SelectItem value="llama-3.1-8b-instant">
-                    Groq - LLaMA3 70B
-                  </SelectItem>
-
-                  <SelectItem value="gemini-2.0-flash">
-                    Google - Gemini 2.0 Flash
-                  </SelectItem>
+                  {isLoadingModels ? (
+                    <div className="p-2 text-xs text-center text-muted-foreground">Yükleniyor...</div>
+                  ) : (
+                    allModels.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    ))
+                  )}
+                  {/* Fallback if list empty and not loading */}
+                  {!isLoadingModels && allModels.length === 0 && (
+                    <SelectItem value="ollama:llama3">Ollama - Llama 3 (Offline)</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </Card>

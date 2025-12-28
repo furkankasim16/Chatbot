@@ -47,3 +47,32 @@ def parse_quiz_intent(text: str) -> Optional[QuizIntent]:
         intent.level = ml.group(1)
 
     return intent
+
+GREETINGS = {
+    "selam", "slm", "merhaba", "mrh", "selamlar", "günaydın", "iyi akşamlar",
+    "hi", "hello", "hey",
+}
+
+def parse_greeting_intent(user_message: str) -> Optional[str]:
+    """
+    Basit selamlaşma kontrolü.
+    """
+    msg = user_message.lower().strip()
+    
+    # Direkt eşleşmeler
+    if msg in GREETINGS:
+        return "greeting"
+        
+    # Kelime bazlı kontrol (daha esnek)
+    # "selam naber", "merhaba nasılsın" gibi
+    words = set(msg.split())
+    if words.intersection(GREETINGS):
+        return "greeting"
+        
+    # Naber/Nasılsın/İyi misin check
+    common_starters = ["naber", "nasılsın", "nasilsin", "iyi misin", "ne haber"]
+    for s in common_starters:
+        if s in msg:
+            return "greeting"
+            
+    return None

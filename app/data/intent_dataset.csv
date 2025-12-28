@@ -1,0 +1,1035 @@
+﻿text,intent
+Ahçiçekle Selam,greeting
+Scrum sprintinde hangi adımların takip edildiğini söyleyecek misiniz?,topic_ask
+Dünyanın en büyük şehri hangisidir,other
+Sürüm planlamasında hangi etapların takip edildiğini belirleyecek misiniz?,topic_ask
+Sorumuzda,greeting
+Bana bir hikaye anlat,other
+Bana masal anlat,other
+Bana bir fıkra anlat,other
+Şarkı söyle,other
+Bana yemek tarifi ver,other
+Bana konu anlat,other
+Bana ders anlat,other
+Konu anlatımı yap,other
+Soruyu sorun,quiz_start
+Soru soralım,quiz_start
+Konusu tartışalım,other
+Nelerdir ki Scrumda Daily Scrumun önemli olduğunu düşünürüz?,topic_ask
+Çınar ağaçlarının altında oturmak çok keyifli.,other
+What is the purpose of a Retrospective Meeting in Scrum?,topic_ask
+Köşkün cephesinde yeni bir kitap var mı?,other
+Yarınki hava nasıl,other
+Hey Hoşgörürüm,greeting
+Sizce en iyi İtalyan restoranları hangileridir?,other
+Gülümseyin Güzel,greeting
+Selamete İnşallah,greeting
+En sevdiğin yemek hangisi?,other
+Soru cevapsız kalır,quiz_start
+"Hoş geldiniz, hoş kalın, hoş kalın",greeting
+Hoşgeldiniz Haydi,greeting
+Sınav zamanı gelindi,quiz_start
+Hoşça kalın Allahın izniyle,farewell
+JIRA nedir ve ne işe yarar?,topic_ask
+Soranın cevabı nedir?,quiz_start
+Sürümün dezavantajlarının önlenmesi nasıl edilir?,topic_ask
+Bugünki hava durumunu izleme,other
+Soruları çözme zamanı,quiz_start
+Sevda selamı,greeting
+Bir konuyu öğreniyorum,other
+Bugün hava nasıl,other
+Merhaba mutlu,greeting
+Testime başlıyor,quiz_start
+Sorularım olsun,quiz_start
+Yolunda olacağız,farewell
+Bana bir sorularım var,quiz_start
+Hey Hoşça Kalın,greeting
+Kanbanın avantajları nedir?,topic_ask
+Allahın selamına,farewell
+Git nedir ve ne işe yer?,topic_ask
+Sınavda iyi sonuç alacam,quiz_start
+"Selamlar, sevgiler",greeting
+Hoşça Kalın Hayat,greeting
+Elli Selam,greeting
+Çok güzel bir gün,farewell
+Testime başlıyoruz,quiz_start
+"Sorma, sorarım",farewell
+Afiyet Olsun Size İnsallah,greeting
+How do I implement Kanban?,topic_ask
+How does Jenkins work?,topic_ask
+What is Continuous Testing?,topic_ask
+Selim olsun,greeting
+Sizin favoriniz hangi hayvan?,other
+Yarın tekrar görüşürüz,farewell
+Bazı günlerde çok yağmur yağsa da...,other
+Afiyet olsun efendim,farewell
+Birbirimize uğrayalım,farewell
+Kesin selamlar,greeting
+Code refactoringi ne işe yarar?,topic_ask
+What is Amazon Web Services (AWS)?,topic_ask
+Bir dergi okuyacak mısın?,other
+Müşteri ihtiyaçlarını belirlemek için hangi yöntemlerin kullanılır?,topic_ask
+Teste giriş yapalım,quiz_start
+Bir sene sonra hangi işte çalışıyorsun,other
+Sürümün dezavantajları nelerdir?,topic_ask
+Asynchronous programming ne işe yarar?,topic_ask
+İyi akşamlar,farewell
+How does JIRA work?,topic_ask
+İstanbulun hangi ulaşımını kullanıyorsun,other
+Bugünkü gazetede haberden bahsetmek istiyorum.,other
+İyi dinuşler,farewell
+Kendi yolu başında buluşalım,farewell
+Kardeşçe selamun,greeting
+Proje sonunda yaşanan sorunların azaltılması nasıl edilir?,topic_ask
+Hayırlı Kariyer,greeting
+Nasıl ki bir günde bir milyon metre,other
+Selamun aleyküm,greeting
+Gülmeye devam et,farewell
+Çıkış yapın,farewell
+Güneşten bir parça alırsın,farewell
+Bir şey sorarım,quiz_start
+Sürüm meetinglerdeki roleler nedir?,topic_ask
+Kapıdan girecek bir şey yok mu?,other
+Yakışıklı selam,greeting
+Selamun Allah,greeting
+Çocuklar için en iyi oyun nedir,other
+"İnşallah, güzel bir gün",farewell
+Günaydın Güzel Hayat,greeting
+"Birleşelim, ayrılmayın",farewell
+Code quality nedir ve ne işe yarar?,topic_ask
+Scrum artifacts what are they?,topic_ask
+Sürümün temel ilkeleri nelerdir?,topic_ask
+İyi bayramlar,farewell
+Çok yağmur yağsa da...,other
+Son kitap hangi yazar tarafından yazıldı,other
+Her ikimize de iyi şeyler,farewell
+En iyi arkadaşım kimdir?,other
+Güzel Selamlar,greeting
+Sorumuzda buluşalım,quiz_start
+Proje sonunda yaşanan sorunlar neye neden olur?,topic_ask
+Soru cevapsız,quiz_start
+"Çevirmeye çalış, iyi dinuşler",farewell
+Bugün hava çok soğuk!,other
+Veri tabanı yönetiminde hangi teknolojilerin kullanıldığını söyleyecek misiniz?,topic_ask
+Bana birşey sor,quiz_start
+Kulüp kapatılıyor,farewell
+Sofistike sistem tasarımında kullanılan teknik nedir?,topic_ask
+Köpeklerin hangi renkli mi,other
+"İyi bayramlar, iyi ki",greeting
+Yıllardır unutulmuş bir şey aklıma geldi,other
+Geliştirme hayatında kullanılacak olan teknoloji nedir?,topic_ask
+Hayırlı Günaydın,greeting
+Bay bay,farewell
+Son maçta Galatasaray kazandı mı?,other
+Mavenin komut satırı nedir?,topic_ask
+Bana bir soru sorarım,quiz_start
+Test Driven Development (TDD) nasıl çalışır?,topic_ask
+Agilein ilkeleri nelerdir?,topic_ask
+Merhaba dostum,greeting
+Sprintin sona ermesinde ne gibi adımlar alınır?,topic_ask
+Söz konusu sorularına,quiz_start
+Güzel bir yolculuk,farewell
+Quizime başlayalım,quiz_start
+Tatlı bir sonlama,farewell
+Türkiyede tatil mi yapıyorsunuz,other
+Jest ile Mocha karşılaştırılması nasıl yapılır?,topic_ask
+Çıkış yap,farewell
+Hoşçakalın,farewell
+Nasipiniz olsun,farewell
+Agile project management toolsu nelerdir?,topic_ask
+Sorumu cevaplama zamanı,quiz_start
+Türkiyenin en güzel şehirleri nelerdir?,other
+Proje Yönetimi Modelleri nelerdir?,topic_ask
+Sıkıntılı yazılım geliştirme nedir?,topic_ask
+Neşeli bir gün oldu mu?,other
+Birşey sorarım lütfen,quiz_start
+Kahwinin sonu,quiz_start
+Sana için,farewell
+Hoşgeldiniz Hayret,greeting
+Doktor muayeneye gitmek zorunda mısınız?,other
+Koç Baba Ol,greeting
+Asana ile Trello karşılaştırılması nasıl yapılır?,topic_ask
+Agile metodolojisinin avantajları nelerdir?,topic_ask
+Kurşunların arkasında hayat var mı?,other
+Bay bay bay,farewell
+Selamlar,greeting
+Kendimi sınava sokmak istiyorum,quiz_start
+REST APIleri arasındaki fark nedir?,topic_ask
+What is a Code Review?,topic_ask
+API security ne işe yarar?,topic_ask
+What is NUnit?,topic_ask
+Herkesin kendine göre bir hayat var mı?,other
+Trellodaki boardlar nelerdir?,topic_ask
+Hoşgörülü Günler,greeting
+Sırkı soruları var,quiz_start
+"Sevgi, saygı ve karamet",farewell
+İyi Günün Için Güzel,greeting
+Hürmetle sevgiyle,greeting
+What is a DevOps Engineer?,topic_ask
+Kendi testine git,quiz_start
+Bugün ne kadar para kazandınız,other
+Köpekler hangi ırktan olmalı?,other
+Note: Ive generated these sentences using natural language processing algorithms and Turkish language rules to ensure they are unique and grammatically correct.,quiz_start
+What is a Sprint Planning Meeting used for?,topic_ask
+Bugün en az 5 saat uyudum.,other
+Kardeşçe Hoşbulduk,greeting
+İyi günler,greeting
+Sonuna gelin,farewell
+"Dikkatli olun, soru sorulur",quiz_start
+Bir sorularına cevaplama,quiz_start
+Selamlar Hayat,greeting
+Sınaime gireyim,quiz_start
+Sen hangi şirketinde çalışıyorsun?,other
+Merhaba Kardesim,greeting
+Yazılım geliştirme processinin hızlandırılması nasıl edilir?,topic_ask
+Sizin en sevdiğiniz yemek hangisidir,other
+Selamlar Bayı,greeting
+Kırmızı kartvizite sahibiz mi,other
+Nelerdir ki bir proje risk teşkil eder?,topic_ask
+Güzelgünler,farewell
+Futbol maçı kaç saat bitti,other
+Sınav yap,quiz_start
+What is a Backend Development?,topic_ask
+"Quizime hazırlanan, sorular",quiz_start
+Bana soruları sor,quiz_start
+Benimle ulaşır,farewell
+Sevgili Arkadaşım,greeting
+Geliştirme hayatında hangi framework’ler kullanılır?,topic_ask
+"Görüşürüz, sevgili dostum",farewell
+Güzel bir gün,farewell
+Sizi düşünüyorum,farewell
+Nasip olsun,farewell
+Kalbimde sizin ol,farewell
+Sizinle İmtihan Mu?,greeting
+Sen ne zaman Fransaya giderdin,other
+Lutfen göreyiz,farewell
+Technical debt nedir ve ne işe yarar?,topic_ask
+Sizin favori spor hangisidir?,other
+Maven Projesinde ne gibi adımlar alınır?,topic_ask
+Ağustos ayında neredeydin?,other
+Yönetici selamı,greeting
+Merhaba günlere,greeting
+How to use Trello effectively?,topic_ask
+What is a Dockerfile?,topic_ask
+"Sevgi dolu kalın, sevgili dostum",farewell
+Fiyatlı marketlerde alışveriş yapabilir mi?,other
+"Sorum var mı, cevaplayalım",quiz_start
+Yüksek puan alma hedefim,quiz_start
+Hoş Buluşma,greeting
+Biraz daha fazla çalışmak zorundalar.,other
+Yine Görüşürüz,greeting
+Öğrenme sürecini başlat,quiz_start
+"Hoş geldiniz, hoş kalın",greeting
+Herkese iyi gelsin,farewell
+Fenerbahçenin maçı kimlerle oynuyor?,other
+Dün gece ne kadar uyudunuz?,other
+Bugun hava çok güzel!,other
+Bugün neler yapacaksınız,other
+Kesinlikle Merhaba,greeting
+"Günaydın, güle, güle",greeting
+Selam olsun,farewell
+Yeni bilgiler edinim,quiz_start
+Test data management ne işe yarar?,topic_ask
+Sevgi dolu kalın,farewell
+Haydi gelin,farewell
+Kırmızı bayrak açarız,farewell
+Çocuklar ne zaman okulda öğrenirler,other
+Kardeşlikte kalmaya,farewell
+Bir soru sorar mısınız,quiz_start
+"Sırasi sona erdi, yeni soru",quiz_start
+Hangi gün hafta sonuna çıkarsın,other
+Düşünme zamanı,quiz_start
+Bir gün denizde yüzdüm mü?,other
+Büyük bir kedinin ailesine bakıyorum.,other
+Futbol maçı izleme partisine katıldın mı?,other
+Hoşgeldiniz,greeting
+Saat 20 civarında ne yaptınız,other
+"Sorularım var, başlamışız",quiz_start
+Ayşe selamı,greeting
+"Hoşça kalın, hoşça bakın",farewell
+Güvenilir bir yol,farewell
+Java dili nedir ve hangi amaçla kullanılır?,topic_ask
+Kendi yolu başında,farewell
+Sınavı bitirmeye çalışalım,quiz_start
+Hangi ayda doğdunuz,other
+Baba selamun,greeting
+İstanbulun tarihi yerleri nelerdir,other
+Yolculuk bitiyor,farewell
+İyi Günler,greeting
+What is Continuous Deployment?,topic_ask
+Asanadaki teamlerin statüsü nedir?,topic_ask
+Karma code review ne işe yarar?,topic_ask
+Selam günlere,greeting
+DevOps nedir ve ne işe yarar?,topic_ask
+Günaydın Yönetici,greeting
+Halen çalıştığın bir iş var mı,other
+Kendimi test etmek istiyorum,quiz_start
+Son maçta gol attın mı?,other
+Here is the list of 50 unique Turkish greeting phrases:,greeting
+Agile manifesto nedir ve hangi amaçla kullanılır?,topic_ask
+Aşağıdaki tabelada fiyatları okuyun.,other
+Sizin gibi selamlar,greeting
+Here is the list of 50 unique Turkish questions:,topic_ask
+Yolunda Selamlar,greeting
+Kod kalitesi nedir ve neden önemlidir?,topic_ask
+Ahşap Selam,greeting
+Sorularını cevaplayayım,quiz_start
+Test edilecek,quiz_start
+Sorumun çözümü,quiz_start
+Fikri kontrol edelim,quiz_start
+Scrum Teamında hangi roller vardır?,topic_ask
+Kalbimle selam,greeting
+Sizin için aşkım,greeting
+Türkiyedeki en iyi okullar hangileri?,other
+Çevik Yürütme nedir?,topic_ask
+İyi Günler Güzel,greeting
+Here is the list of unique Turkish greeting phrases:,greeting
+Proje Planlama Protokolünü nedir?,topic_ask
+Son zamanlarda ne tür kitap okuduğunu sormaya çalışıyorum.,other
+Son dakika,farewell
+Türkiyede en fazla kullanılan dil nedir?,other
+Kubernetes deployment nedir ve nasıl oluşturulur?,topic_ask
+Güzel Günün Için Merhaba,greeting
+How does AWS Lambda work?,topic_ask
+What is the difference between a Feature and a User Story?,topic_ask
+Fikri kontrol etelim,quiz_start
+Dostça Selamlar,greeting
+İnşallah tekrar görüşürüz,farewell
+Elli Selamlar,greeting
+Hoş buldum,greeting
+How does Test-Driven Development improve code quality?,topic_ask
+Allahaısmarladık,farewell
+Selamlar dostum,greeting
+Bir konuda öğrendiklerimi paylaşalım,quiz_start
+"Selimane, selimane, iyi dinuşler",farewell
+Seyahatlerinizden,greeting
+"Evet, üniversiteye gitmedim",other
+Milletimizle,farewell
+Senin en sevdiğin yemek ne?,other
+Selamün aleyküm,greeting
+Bana bir soru sor,quiz_start
+Siz hangi dille konuşur,other
+İyi ki geldin,greeting
+Senin en sevdiğin yiyecek nedir,other
+What are Software Development Life Cycles?,topic_ask
+Bir problem verin,quiz_start
+Bugün Akhisarda oynayan futbolcular kimlerdir?,other
+Örnek soruları başlat,quiz_start
+Sorularım yok,quiz_start
+Sevgilerle,farewell
+Kahve içmek ister misin?,other
+API Response nedir ve ne işe yarar?,topic_ask
+Aşkınızın sonsuz,greeting
+Bir şans verildi,quiz_start
+Sen hangi ilde doğdun?,other
+Vazgeçilmez bir keyif,farewell
+İyi Dinleyin,greeting
+Bir hafta sonra neler yapacaksınız,other
+What is Microsoft Azure?,topic_ask
+Kırmızı bir arabanın sahibi var mı?,other
+Test için hazırlayın,quiz_start
+Doktor muayeneye gitmek zorundalar.,other
+Sözün sana,greeting
+Proje planlamasında hangi faktörler göz önüne alınır?,topic_ask
+Kullanıcı deneyimi nasıl iyileştirilir?,topic_ask
+İyi Günler Hoşca Kalın,greeting
+Sizinle İmtihan Haydi,greeting
+API Key nedir ve ne işe yarar?,topic_ask
+What is a Pull Request?,topic_ask
+"Sorum yok, cevaplayalım",quiz_start
+Kendimi zorlama,quiz_start
+"Evet, çalışıyorum",other
+Sürpriz parti planlarını yapıyorum!,other
+Kalbimde sizin,farewell
+JIRA Cloud nedir ve ne işe yarar?,topic_ask
+"Yüzümde gülümseyin, iyi akşamlar",farewell
+Bana bir sorularım,quiz_start
+Türkiyede en fazla kullanılan araç nedir?,other
+What is xUnit?,topic_ask
+Behavior-driven development (BDD) nasıl çalışır?,topic_ask
+Hayırlı günde,farewell
+Süreye bakarım,farewell
+"Güzel bir gün için, güzel ki",greeting
+Sürüm retrospectiveunda hangi konular var?,topic_ask
+Tahırlarına kaldı,farewell
+API Request nedir ve ne işe yarar?,topic_ask
+Hümaydi olur,farewell
+Nelerdir ki bir proje riskli bulunur?,topic_ask
+Bu ayın 15i ne zaman?,other
+Çayda kafein var mı?,other
+Kimlikli selam,greeting
+Sizi seven insanların sayısı kaçtır?,other
+Sorularım yok mu,quiz_start
+Bir soru sorun,quiz_start
+Proje Yönetimi Pekiştirme nedir ve ne işe yarar?,topic_ask
+JIRA Service Desk nedir ve ne işe yarar?,topic_ask
+Haydi bakalım,farewell
+Hayırlı Aşk,greeting
+Ödevimi tamamlamalıyım,quiz_start
+What is the purpose of a Daily Scrum Meeting in Scrum?,topic_ask
+Sınavı bitir,quiz_start
+Güler yollar,farewell
+Yüksek puan alma umudundayım,quiz_start
+Sözcüklerini anlatabiliyorum mı,other
+Hoşbuluşma Sayın,greeting
+Pair programming ne işe yarar?,topic_ask
+Bir soruyu sorayım,quiz_start
+What is Behavior-Driven Development?,topic_ask
+Asanadaki workflowları nelerdir?,topic_ask
+Kulüp kapatıldı,farewell
+Selamlar Güzel,greeting
+Geliştirme hayatında hangi programlama dilleri kullanılır?,topic_ask
+What is User Story?,topic_ask
+Sevgi ve saygı ile,farewell
+TDD hangi amaçla kullanılır?,topic_ask
+Güneşe ulaşacağız,farewell
+Tıpkı yeni bir gün,farewell
+İstanbulun en güzel yerleri nelerdir,other
+"Görüşürüz, mutlu",farewell
+Dünyanın en kötü şehri hangisidir,other
+Dostça selam,greeting
+Sınavdan sonra ne yaptın?,other
+Güzel bir gün için,greeting
+Sorularımı cevaplaştırım,quiz_start
+Sen hangi dili konuşuyorsun?,other
+Benim için bir soru hazırlayın,quiz_start
+Dikkatli bir sınav yap,quiz_start
+Sınav yapalım,quiz_start
+Kırmızı renkli evlerin sayısı ne kadardır?,other
+Günaydın sevgili,greeting
+Kesin bir cevap,quiz_start
+Selam hayat,greeting
+Hava bugün nasıl?,other
+Hakikaten selamlar,greeting
+Sürüm planlamasında hangi tekniklerin kullanıldığını belirleyecek misiniz?,topic_ask
+Siz evde misiniz,other
+Bana bir problem çözeyim,quiz_start
+Quiz başlatma,quiz_start
+What is a Helm Chart?,topic_ask
+Yolcuların çoğu kaçırıyor.,other
+İstanbulun en iyi kütüphanesi nedir?,other
+API documentation ne işe yarar?,topic_ask
+Yaşamın boyunca,greeting
+Eline sağlık,greeting
+Görüşmek üzere,farewell
+Domain-driven design nedir?,topic_ask
+Selam bu kez,greeting
+Saat 2de nerdesin?,other
+Merhaba Sayın Ol,greeting
+Agile project management ne işe yarar?,topic_ask
+Güneş ışığı nasıldır bugun,other
+Kanban Boardunda ne gibi adımlar alınır?,topic_ask
+Here is the list of 50 unique Turkish farewell phrases:,farewell
+Bir şey satın almak için para lazım.,other
+"Hoşça kalın, iyi Pazarlar",farewell
+Selamün Aleyküm,greeting
+Konusunu çalışalım,quiz_start
+Kendimi sınava soktım,quiz_start
+Dün gece ne zaman uykuya daldın?,other
+Scrum takımının üyelerinin rolleri nelerdir?,topic_ask
+Görüşürsen,farewell
+Hoşça kalın dostum,farewell
+Geliştirme hayatında hangi teknolojiler popülerdir?,topic_ask
+Saat 11da ne yedin?,other
+Veri tabanı optimizasyonunu nedir?,topic_ask
+Haberiniz olsun,farewell
+Oyunlar için kasa paraları var mı?,other
+Geliştirme hayatında hangi teknoloji kullanılır?,topic_ask
+Büyük bir kedinin adı nedir?,other
+Bugünkü hava nasıl?,other
+Agile projesinin aşamaları nelerdir?,topic_ask
+Güllerimi sana,farewell
+Merhaba Dünyalı,greeting
+"Farewell, hasta",farewell
+Umarım iyi,farewell
+Kırmızı gök bulutları var mı?,other
+Ahçiçek,greeting
+Kullanıcı memnuniyetinin ölçümü nasıl yapılır?,topic_ask
+Haydi bakalım,greeting
+Yarınki planlarını belirleyelim,other
+Kalpime emanet ol,farewell
+Allah koruma eder,farewell
+Kardeşinize,greeting
+Kardeşinizden,greeting
+Tasarım kalite kontrolesinde kullanılan araçlar nelerdir?,topic_ask
+"Merhaba, mübarek olsun",greeting
+Bu akşam hangi film oynuyor,other
+Sırkı sorular,quiz_start
+Bana bir sorular,quiz_start
+Bir problem sorar mısınız,quiz_start
+Müşteri ihtiyaçlarını belirlemek için hangi tekniklerin kullanılır?,topic_ask
+Dün gece yağmur vardı mı?,other
+What is a Backlog Refinement?,topic_ask
+Kendimi sınayacak mıyım?,quiz_start
+Merhaba evinin,greeting
+Konusu öğreniyorum,quiz_start
+"Gülmeyin, iyi akşamlar",farewell
+Maven hangi amaçla kullanılan bir araçtır?,topic_ask
+Her şey yolunda olsun,farewell
+Yolculuk etmek için planlarınızdır.,other
+Selamlar Dünya,greeting
+İnşallah görüşürüz,farewell
+Sınava gireyim,quiz_start
+Sizden daha hızlı birini gördüm.,other
+Kesin bir cevap var,quiz_start
+Selamlar ailece,greeting
+"Allah razı olsun, iyi akşamlar",farewell
+Vazgeçemezsin,farewell
+Senin favori yemek hangisidir?,other
+User acceptance testing (UAT) nasıl çalışır?,topic_ask
+Aşkın selamı,greeting
+Bugün hangi saatte güneş battı?,other
+"Tatlı rüyalar, tatlı bir sonlama",farewell
+Dün gece hangi saatte uyuya daldın?,other
+Selam bir daha,greeting
+Selamun aleyküm,farewell
+Hoşbulduk Mu?,greeting
+Bana bir test sorun,quiz_start
+Aşkının selamı,greeting
+Çocukluğunda neler yaptı?,other
+Herkesin kendine göre bir hikâye var mı?,other
+Kesinlikle sevgiyle,greeting
+Günaydın Gülbahar,greeting
+Kodlama dilini seçimi neden önemlidir?,topic_ask
+Kırmızı renkli evlerin sayısı kaçtır?,other
+Sorumuzu cevaplayın,quiz_start
+Kendi kendine bakın,farewell
+Quiz için hazırlanın,quiz_start
+MVC architecture nedir ve nasıl oluşturulur?,topic_ask
+Sonrasında,farewell
+What is a Velocity in Scrum?,topic_ask
+Kesinlikle Selam,greeting
+Soruların cevaplarını bulalım,quiz_start
+Bugün hava çok sıcak!,other
+Hürmetle,greeting
+Hoş geldiniz,greeting
+Hoşbuluşma Ol,greeting
+Kendimi sınama zamanı,quiz_start
+İyi Günün Için Selam,greeting
+Güneşli gün olsun,greeting
+Sen hangi collegeden mezun oldun?,other
+"Merhaba, iyi ki ol",greeting
+Sınava hazırlanan,quiz_start
+Dinleniyoruz,farewell
+Yazılım geliştirme processinin risk yönetimi nedir?,topic_ask
+Allahın izniyle,farewell
+Çevirmeye çalış,farewell
+Yönetim sizin,greeting
+Selam dostum,greeting
+MVC patterni nasıl işler?,topic_ask
+Dostça kalsın,farewell
+Yeni bir Gün olsun,greeting
+Hadi bakalım,farewell
+What is Serverless Architecture?,topic_ask
+Ne zaman ilk kez denizde yüzdünüz?,other
+Büyük bir keyif,greeting
+Görüşmeden sonra,farewell
+Hey Güzel,greeting
+Doğru yolu bulalım,quiz_start
+Sevgi ve saygı,farewell
+Futbol maçında kim oynuyor,other
+Testime katılalım,quiz_start
+Sınava giriyoruz,quiz_start
+Kotlin dili nedir ve hangi amaçla kullanılır?,topic_ask
+Futbol maçı kaç dakika bitti,other
+How does Selenium work?,topic_ask
+Kısmet olsun,farewell
+Allah koruma,farewell
+Selam aleyküm,greeting
+"Selamun aleyküm, Allahın izniyle",greeting
+Sizin favori film hangisidir?,other
+Büyük bir mağaza açmaya karar verdik.,other
+Tıpkı yeni bir gün ol,farewell
+Jest ile Enzyme karşılaştırılması nasıl yapılır?,topic_ask
+Sorumum var,quiz_start
+Haydi gidelim,farewell
+Son soruya bakalım,quiz_start
+Yüzümde gülümseyin,farewell
+Kesin olarak,quiz_start
+Agile Yönetimi Modelleri nelerdir?,topic_ask
+"Sınav başladı, devam edelim",quiz_start
+Duygularınızı saklayın,farewell
+Here is the list of unique Turkish farewell phrases:,farewell
+Bugünkü hava Conditionu nedir?,other
+Here is the list of unique random Turkish sentences:,other
+Testi geçirelim,quiz_start
+Bay bay bakar,farewell
+Soru sorarım,quiz_start
+Tatlı bir şey yemeği isteyecek mi?,other
+Sürüm nedir?,topic_ask
+Ne zaman ilk kez uçakla seyahat ettim?,other
+Bu hafta hangi kitap okudun?,other
+Günaydın,greeting
+Merhaba Dostum,greeting
+Bayramı kim unutuyor?,other
+Çok yağmur yağdı,other
+"Sorum yok, sorularım var",quiz_start
+Sizden ayrılmak,farewell
+Seni sevenlere,farewell
+Sizinle Buluşmak Mutluluktur,greeting
+Görüşürüz,farewell
+Sizin favori yemeği nedir,other
+What is Continuous Integration?,topic_ask
+Her şeyin iyisi ol,farewell
+Hola Türk,greeting
+Kardeşçe kalsın,farewell
+Kendimi test etmek isterim,quiz_start
+Proje planlamasında kullanılan yöntemler nelerdir?,topic_ask
+Bana bir problem verin,quiz_start
+"Bildiğiniz gibi, ben de bir robotum!",other
+"Hey, bakalım",greeting
+Fenerbahçenin yenilgisine üzüldüm,other
+Kesin testime katilım,quiz_start
+Sevgili Kardesim,greeting
+Sınavdaki durumumu öğrenirim,quiz_start
+Futbolcuların en iyisi kimdir?,other
+Bugün erken saatlerde ne yedin,other
+Yolun açık olsun,farewell
+Bugün neler yapacağız?,other
+Dersini bitirelim,farewell
+Sizi düşünüyoruz,farewell
+Sıcak Kalın,greeting
+What is Google Cloud Platform (GCP)?,topic_ask
+API rate limiting nasıl çalışır?,topic_ask
+What is the difference between a Task and a User Story?,topic_ask
+"İyi bayramlar, mübarek olsun",greeting
+Bana bir challenge vermeyin,quiz_start
+DevOps culture nedir?,topic_ask
+"Görüşmeliğiz, Allahın izniyle",farewell
+Güzel Gün,greeting
+Sınav zamanı,quiz_start
+Görüşmek için bekliyorum,farewell
+"Günaydın, güle",greeting
+Dostluğun devamını,greeting
+Kardeşçe Gülümseyin,greeting
+Bana soru sor,quiz_start
+What is Test-Driven Development?,topic_ask
+Sizin favori spor nedir,other
+Çocukluğumda oynadığım oyun nedir,other
+Kendine iyi bakın,farewell
+"İnşallah rastlaşırız, rastlaşırız",farewell
+Fenerbahçe maçını izledin mi?,other
+Dostça Günaydın,greeting
+Quiz başlatma zamanı geldi,quiz_start
+"Aşkının selamı, aşkın selamı",greeting
+What is MSTest?,topic_ask
+Sorumun cevabı nedir,quiz_start
+Scrum value nedir?,topic_ask
+Yeni gün olsun,greeting
+Sürüm kontrolünde hangi araçların kullanıldığını söyleyecek misiniz?,topic_ask
+"Quizime giriş yap, başlayalım",quiz_start
+Sınava giriş,quiz_start
+Cenaze selamı,greeting
+MVC framework nedir ve hangi amaçla kullanılır?,topic_ask
+Kendi halinde,farewell
+Sevgili dostum,farewell
+"Bir dakika, testime giriş yap",quiz_start
+"Günaydın, güle güle",greeting
+Ahşap Selamlar,greeting
+Bir konuda öğreneceğiz,other
+Gülmek var,farewell
+Merhaba Mutlulu Gülbahar,greeting
+Kendim için bir şehrime karar verdim,other
+Nurallah için,farewell
+Aşk dilekleri,farewell
+Sizin için var,greeting
+Kırmızı kartvizitime ihtiyaç var mı,other
+Database schema nedir ve nasıl oluşturulur?,topic_ask
+Hangi ayda tatil mi yapıyorsunuz,other
+Sınava girişime,quiz_start
+Problemime bak,other
+"İyi dinuşler, iyi gidecek",farewell
+Tasarım kalite kontrolesinin süreci nedir?,topic_ask
+İyi günde,farewell
+Yakında hangi festivali organize ediyorlar?,other
+Nasıl ki bir günde bir milyon kilometre,other
+Soru sorun,quiz_start
+"Testin başlangıcı, başlatıyorum",quiz_start
+Kardeşimin adını söylemek zor,other
+Yolunda Merhaba,greeting
+Asanadaki tasklerin statüsü nedir?,topic_ask
+Sevgili arkadaşım,farewell
+Sürümün rolü nedir?,topic_ask
+Nazar seni hep hayır,farewell
+Agile manifestosunda hangi prensipler var?,topic_ask
+Sorularını cevaplayalım,quiz_start
+Quizime hazırlanan,quiz_start
+Selam Sana,greeting
+Test için hazırlanın,quiz_start
+Ağaçtaki ağaçları ören mi?,other
+Bir soruyu istiyorum,quiz_start
+Quiz zamanı,quiz_start
+Bugün öğrendiğim şey nedir,other
+How does Continuous Integration work in Agile?,topic_ask
+Son kez hangi filme gitmiştin?,other
+Testini tamamlamam gerekir,quiz_start
+API security nasıl sağlanır?,topic_ask
+Güldürmeyen Günü,greeting
+Selam mutlu,greeting
+Çözüm bulmaya çalış,other
+Sorum yok mu?,quiz_start
+Görüşmeliğiz,farewell
+Saat 12de ne yapacaksınız?,other
+API’nin kullanımı ne işe yarar?,topic_ask
+Kodlama dilinin seçimi neden önemlidir?,topic_ask
+Kendini beğenme,farewell
+Bana bir problem,other
+Selamün Aleyküm Allah,greeting
+Selam canım,greeting
+Senin için,farewell
+Görüşmeliydik efendim,farewell
+Koç Baba,greeting
+Merhabalar Dünya,greeting
+Bir şey daha sorarım,topic_ask
+How to create a Burn-Down Chart?,topic_ask
+What is a Frontend Development?,topic_ask
+Microservices architecture nedir?,topic_ask
+"Yönetici selamı, yönetici selamı",greeting
+Nelerdir ki bir proje zor bulunur?,topic_ask
+Sınaime başlayalım,quiz_start
+API Gateway nedir ve ne işe yarar?,topic_ask
+Soruların çözümü,other
+Kardeşçe,farewell
+İstanbulda yaşamaya karar verdim,other
+How does a Kanban board work?,topic_ask
+"Sorum yok, başlatıyorum",quiz_start
+Uzun zaman,farewell
+"Merhaba, güzel günde, güzel ki",greeting
+Bugün hangi saatte uyudunuz,other
+Tren seferi kaç dakikada var?,other
+İyi ki varsın,greeting
+Her şeyin iyisi,farewell
+Sevgili dostum,greeting
+Aşkınızın sonsuza,greeting
+Kendi halindeğiz,farewell
+Hoşça kalın,greeting
+Dostça kalın,farewell
+Bana bir şaka yap,other
+Hoşgeldiniz Sevgili Arkadaşım,greeting
+Sırada bir sorun var,other
+"Vazgeçilmez bir keyif, iyi gidecek",farewell
+Güzel bir Gün,greeting
+Merhaba Sayın,greeting
+Mavendeki dependencies nedir?,topic_ask
+Kesin olarak yanıt,quiz_start
+Bir gün ağaçta kalmaya çalıştım mı?,other
+Sevgili selamı,greeting
+Aşkım Selam,greeting
+Sevgili dostumuza,farewell
+Agile metodolojisi hangi durumlarda kullanılır?,topic_ask
+"Haydi git, iyi ki",farewell
+Güneşin ışığı,greeting
+Çok iyi günde,farewell
+Çok iyi şanslar,farewell
+Tren seferi kaç saat sürecektir?,other
+Sınava giriş yaptık,quiz_start
+Scrum takımının rolü nedir?,topic_ask
+API gateway nasıl çalışır?,topic_ask
+Çözüm bulalım,quiz_start
+"Bana bir problem sor, cevapla",quiz_start
+What is the difference between a Task and a Feature?,topic_ask
+Sen hangi şehirdensin?,other
+İstanbulda yaşamaya ne dersin,other
+Selam sevgili,greeting
+"Sınav zamanı, başlatıyorum",quiz_start
+Son maçta Fenerbahçe kazandı mı?,other
+Sizinle Güzel Günaydın,greeting
+Görüşürüz dostum,farewell
+Proje sonunda yaşanan sorunların çözümü nasıl yapılır?,topic_ask
+Fiyat olarak en ucuz olan araba hangisidir?,other
+Türkiyede en fazla hangi hayvan var?,other
+Sizi seviyorum,farewell
+Kalbime evinizde kalın,farewell
+Fakat biz varız,farewell
+What is a Task in JIRA?,topic_ask
+What is a User Interface?,topic_ask
+Bana bir problem sor,quiz_start
+"Sınav zamanı, başlangıç",quiz_start
+Futbol maçı hangi saatinde bitti?,other
+Software Development Life Cyclede hangi aşamalardır?,topic_ask
+Neşeli selamlar,greeting
+Sen ne zaman İstanbula gelirsin,other
+Sınav zamanı geldi,quiz_start
+Her şeyden mutlu,farewell
+İyi Dinleyin Lütfen Size,greeting
+Bugün hava nasıl geçiyor?,other
+Sırkı soruları,quiz_start
+How do I implement CI/CD?,topic_ask
+Bugünkü haberden bahsetmek istiyorum.,other
+Aşkınızı yutmeyin,farewell
+"Sevda selamı, sevda selamı",greeting
+Yolumuz ayrıldı,farewell
+Çarkı felek demeden,farewell
+Testime hazırım,quiz_start
+Quiz başlatım,quiz_start
+"Hoşça kalın, hoş kalın",greeting
+API key nasıl oluşturulur?,topic_ask
+Hürmetle kaldık,farewell
+Agilein ilkeleri hangi amaçla kullanılır?,topic_ask
+İstanbulda dolaşmaya ne dersin,other
+Pair programming benefitsi nelerdir?,topic_ask
+Afiyet Olsun Ol,greeting
+Ne kadar güzel,farewell
+Continuous integration (CI) nedir ve ne işe yarar?,topic_ask
+Çok iyi bayramlar,farewell
+What is a Sprint in Scrum?,topic_ask
+Hoşça kalın,farewell
+Bir şans verin,quiz_start
+Sınavı başlatıyorum,quiz_start
+Güneşteki ışıkların renkleri nelerdir?,other
+Bu akşam ne yapacaksınız?,other
+Sokağın temizliği ne durumda?,other
+Sürüm kontrolünde hangi metriklerin kullanıldığını belirleyecek misiniz?,topic_ask
+Ağustos ayında yağmur var mı?,other
+What is the purpose of a Burn-Down Chart in Scrum?,topic_ask
+"İyi geceler, iyi pazarlar",farewell
+Gördüğünüzde,farewell
+Tasarım kalite kontrolesinin yöntemleri nelerdir?,topic_ask
+Ağustos ayında yazlıklar var mı?,other
+Siz hangi şehirde doğdunuz,other
+Kullanıcı deneyimi nedir?,topic_ask
+Selimane,farewell
+Farewell words,farewell
+Kendimi sınava sok,quiz_start
+Güzel Günaydın,greeting
+Uzun zaman için,farewell
+En fazla 500 TL harcayabilirim.,other
+Nelerdir ki bir proje başarısız olur?,topic_ask
+Quizime girmiyorum,quiz_start
+İyi bir gün geçirmiyor,other
+Sorumun cevapsız kaldı,other
+"Bir dakika, sınava gireriz",quiz_start
+Sizi sevgiyle,farewell
+Bana bir problem sorun,quiz_start
+"Merhaba, güzel günde",greeting
+What is JUnit?,topic_ask
+İyi Günün Için Hey,greeting
+Soruime göre sınava gireriz,quiz_start
+"İyi günde, iyi akşamlar",farewell
+"Bana bir soru sorun, cevapla",quiz_start
+What is a Use Case?,topic_ask
+Kahwinin başlangıcı,quiz_start
+Quiz tamamlandı,quiz_start
+What is a Story in Scrum?,topic_ask
+Yakın zamanda hangi film izlediniz,other
+İyi ki gelseyin,greeting
+Yarın görüşürüz,farewell
+Sırımızı çözelim,quiz_start
+Son günlerde ne tür müzik dinliyorum?,other
+Aşkım olsun,greeting
+Kendimi sınama,quiz_start
+Testi başlatıyorum,quiz_start
+Gelişimize,farewell
+Sorum var mı?,quiz_start
+Ağabeyimin adın ne,other
+Herkese hayırlı olsun,farewell
+"Merhaba, iyi bayramlar",greeting
+Sınavı başlat,quiz_start
+CI/CD pipelineleri arasındaki fark nedir?,topic_ask
+Yarın görüşürüz Allahın izniyle,farewell
+Agile teamünün rolü nedir?,topic_ask
+Yağmur gibi yağarız,farewell
+Sizinle İmtihan,greeting
+Çevrimiçi kalmayın,farewell
+İstanbulun en iyi restoranları hangisi?,other
+Benim sınavım,quiz_start
+TDDi hangi amaçla kullanırsınız?,topic_ask
+Çindeki en iyi restoranları hangileridir?,other
+Dostunuzun keyif,greeting
+Yaklaşık kaç kilometre mesafe,other
+Hangi bölümde okuyorsunuz,other
+Sürüm planlamasında hangi risklerin karşılandığına dair bilgi verebilir misiniz?,topic_ask
+What is the purpose of a Sprint Review Meeting in Scrum?,topic_ask
+Son kez hangi şehirde kaldın?,other
+Merhaba türkiye,greeting
+Bugün en fazla 2 saat uyudum.,other
+Sürümün avantajları nelerdir?,topic_ask
+Çözüm yok mu?,quiz_start
+Soruların başlayalım,quiz_start
+En sevdiğiniz film hangisi?,other
+"Testin başlangıcı, başlayalım",quiz_start
+"Selamlar, sevgi dolu",greeting
+What are Software Requirements?,topic_ask
+Örnek soruları başlatma,quiz_start
+Ahşap Hoşbulduk,greeting
+Namazda selam,greeting
+Sokağın ışıkları ne kadar sürede yakılıyordur?,other
+En sevdiğiniz yemek hangi dişi?,other
+Bu hafta sonu plansın nedir?,other
+Scrum frameworki hangi prensiplerine dayanır?,topic_ask
+What is a Cloud Computing?,topic_ask
+Quizime katilım,quiz_start
+"Bir dakika, sorun yok mu?",quiz_start
+Hürmetle gidiyor,farewell
+Sizi seviyor,farewell
+"İyi günde, iyi pazarlar",farewell
+"Bir dakika, bir soru sor",quiz_start
+Afiyet Olsun Size,greeting
+Saat 14te ne yapacaksınız?,other
+"Kötü değil, güzel",farewell
+Ücretli parklarda araçlar var mı?,other
+What is the purpose of a User Story in Scrum?,topic_ask
+Yarın tekrar,farewell
+En sevdiğin filme ne zaman gidiyorsun?,other
+Kotlin ile Javadan fark nedir?,topic_ask
+Bana bir quiz sorun,quiz_start
+Kendimi sınava sokuyorum,quiz_start
+Bir konu üzerinde çalışalım,quiz_start
+En sevdiğim yemek ne biliyor musun?,other
+Türkiyedeki en ünlü aktör kimdir?,other
+"Hoşgeldiniz, çıkış yapın",farewell
+Testin başlangıcı,quiz_start
+Testimize katılıyorum,quiz_start
+Afiyet Olsun,greeting
+Gününizi İyi Geçirin,greeting
+Bir sorun var,quiz_start
+Nelerdir ki bir proje başarılı olur?,topic_ask
+Bu akşam hangi konseri izleyecek misiniz?,other
+Kanban nedir ve ne işe yarar?,topic_ask
+Sınavı bitirdim,quiz_start
+Kullanıcı memnuniyetinin artması nasıl edilir?,topic_ask
+Java Script dili nedir ve hangi amaçla kullanılır?,topic_ask
+Quiz başlamadan önce,quiz_start
+Düşmana karşı durursun,farewell
+"Günaydın, mutlu ol",greeting
+What is an Epic in Scrum?,topic_ask
+Sonrasını göreceğiz,farewell
+Let me know if you need anything else!,quiz_start
+Bir soru sordu mısınız,quiz_start
+Sırada ne var?,quiz_start
+Kendi halinde kalın,farewell
+Kırmızı bir arabaya ihtiyaçımız var.,other
+Hoşça kalsın,farewell
+Kendimi sınayacak,quiz_start
+İstanbulun en büyük parkı nedir?,other
+Son derece iyi günde,farewell
+Sorularına cevap verme,quiz_start
+Yine Görüşürüz Haydi,greeting
+Müşteri ihtiyaçlarını belirlemek için hangi metriklerin kullanılır?,topic_ask
+Bir sorunun çözümü,quiz_start
+Görüşürsen dostum,farewell
+Herkesin kendine göre bir müzik var mı?,other
+Sizinle Selamlar,greeting
+Güzel Günler Hayret,greeting
+Kışın son günlerinde yağmur azdır,other
+Let me know if you need anything else!,greeting
+Here is the list of 50 unique Turkish commands to start a quiz or ask for a question:,quiz_start
+Sizin için varım,greeting
+What is Full-Stack Development?,topic_ask
+Here is the list of 50 different and unique Turkish questions:,topic_ask
+Türkiyenin en ünlü restoranı hangisi?,other
+"Allahaısmarladık, kardeş",farewell
+Hayırlı Gelişler,greeting
+Görüşürüz efendim,farewell
+Kimlik Doğrulama Protokolünü nedir?,topic_ask
+Scrum teamünün rolü nedir?,topic_ask
+Sorum var,quiz_start
+Kendimi sınavdan geçiriyorum,quiz_start
+İyi geceler,farewell
+Veri tabanı normalizasyonunu nedir?,topic_ask
+API gateway nedir ve ne işe yarar?,topic_ask
+Afiyet olsun Allahın selamına,farewell
+Hayatını Uzunca Selam,greeting
+Here is the list of 50 unique random Turkish sentences:,other
+Hoşçakal,farewell
+Bazı insanlar hangi dilde konuşur,other
+Bana cevap verin,quiz_start
+Güzel Hoşgeldiniz,greeting
+Bu hafta sonu ne yapacaksın?,other
+Here is the list of unique Turkish commands to start a quiz or ask for a question:,quiz_start
+Quiz başlatıyorum,quiz_start
+Kod kalitesinin artması için hangi yöntemlerin kullanıldığını söyleyecek misiniz?,topic_ask
+Quiz zamanı gelindi,quiz_start
+Bir soru sor,quiz_start
+Kediiniz hangi rengin mi,other
+Nazarın hep hayır,farewell
+"Evet, iyi akşamlar",farewell
+Kalbimizle konuşuruz,farewell
+Nelerdir ki Scrumda Product Ownerun rolü önemlidir?,topic_ask
+Merhaba,greeting
+Sorumu sor,quiz_start
+Hoşça Kalın Güzel Hayat,greeting
+Haydi gidiyor,farewell
+Bu sene hangi konserleri izlediniz,other
+Sorularımı sor,quiz_start
+"Selamlar, mübārek olsun",greeting
+Here is the list of 50 different and unique Turkish farewell phrases:,farewell
+Çok hayır,farewell
+Hemen ulaşır,farewell
+Sorumuzu başlayalım,quiz_start
+Huzurunuz olsun,farewell
+Soruları çözelim,quiz_start
+"Selamlar, mübārek olsun, mübarek olsun",greeting
+Sorumun çözümü var,quiz_start
+Günaydın Güzel,greeting
+Bir hafta sonra hangi konseri göreceksiniz,other
+İstanbulda hangi tarihte kuruldu,other
+Güzel Günler Selamun,greeting
+Kesin soru sor,quiz_start
+Kendi testimi yapalım,quiz_start
+Çıkış yapçık,farewell
+Gecen güne selam,greeting
+Test-driven development (TDD) nedir ve ne işe yarar?,topic_ask
+En sevdiğim oyun hangisi?,other
+Test ediyorum,quiz_start
+"Sorunu sorun, cevapsız",quiz_start
+Nelerdir ki bir proje başarılı olmaz?,topic_ask
+İyi ki var,farewell
+Oyunlar için para lazım.,other
+İyi dinleriz,farewell
+How does Continuous Deployment work in Agile?,topic_ask
+Sizinle Buluşmak Selamun,greeting
+İyi Dinleyin Lütfen,greeting
+İyi ki varsın,farewell
+API hangi dilde programlanmalıdır?,topic_ask
+Birşey öğrenmek istiyorum,other
+What is the difference between a Story and an Issue?,topic_ask
+Kırmızı bir maske giyen adam var mı?,other
+Sprint Planında ne gibi adımlar alınır?,topic_ask
+Kardeşçe Selamlar,greeting
+Sizin için bir şey düşünmez,farewell
+Nelerdir ki bir proje gelişmez?,topic_ask
+Saat 10da ne yedin?,other
+Bugünkü maçın sonuçlarını izlemek istiyorum.,other
+Kendi kendine sorularına,other
+Tatlı bir son,farewell
+Merhaba hayat,greeting
+Dün gece hangi kitabı okudunuz?,other
+Vazgeçemezsiniz,farewell
+Mehmet efendi gibi,farewell
+Gülümseyin Güzel Gün,greeting
+Eğer ki gidersen,farewell
+"Sınav başladı, başlayalım",quiz_start
+Son günlerde ne tür kitap okuduğunu sormaya çalışıyorum.,other
+"Gülmeyin, gülmeyin, iyi gidecek",farewell
+Quizime katılın,quiz_start
+Çözüm bulmaya çalışalım,other
+Scrum takımının sorumlulukları nelerdir?,topic_ask
+Gidiyor musun,farewell
+What is Automated Testing?,topic_ask
+Evet,confirmation
+Tabii ki,confirmation
+Olur,confirmation
+Kesinlikle,confirmation
+Tamamdır,confirmation
+Kabul ediyorum,confirmation
+Baxlayalım,confirmation
+Evet lütfen,confirmation
+Hayır,rejection
+İstemiyorum,rejection
+Hayır texekkürler,rejection
+Olmaz,rejection
+Reddediyorum,rejection
+Kalsın,rejection
+Gerek yok,rejection
+Şimdilik hayır,rejection
+bu konuda bir quiz yapmak istiyorum,quiz_start
+bu konuda quiz yapalım,quiz_start
+quiz yapmak istiyorum,quiz_start
+bana bir quiz yap,quiz_start
+kendimi denemek istiyorum,quiz_start
+konuyu anladım sorulara geçelim,quiz_start
+haydi test çözelim,quiz_start
+test olmak istiyorum,quiz_start
+quiz time,quiz_start
+soru çözmek istiyorum,quiz_start

@@ -21,7 +21,15 @@ def validate_question_schema(mcq: Dict[str, Any]) -> None:
     """
 
     # 1) Temel alan kontrolü
-    required_keys = ["question", "options", "correct_option_index", "explanation"]
+    # 1) Temel alan kontrolü
+    # Open Ended veya MCQ ayırımı yapalım
+    is_open_ended = "answer" in mcq and "options" not in mcq
+    
+    if is_open_ended:
+        required_keys = ["question", "answer", "explanation"]
+    else:
+        required_keys = ["question", "options", "correct_option_index", "explanation"]
+
     for key in required_keys:
         if key not in mcq:
             raise QuestionValidationError(f"Eksik alan: {key}")
@@ -32,8 +40,12 @@ def validate_question_schema(mcq: Dict[str, Any]) -> None:
         raise QuestionValidationError("question alanı string olmalı.")
     if len(question.strip()) < 5:
         raise QuestionValidationError("Soru çok kısa (5 karakterden az).")
-    if len(question.strip()) > 500:
-        raise QuestionValidationError("Soru çok uzun (500 karakteri geçiyor).")
+    if len(question.strip()) > 1000:
+        raise QuestionValidationError("Soru çok uzun (1000 karakteri geçiyor).")
+    
+    if is_open_ended:
+        # Open Ended ise options kontrolünü atla
+        return
 
     # 3) options
     options = mcq["options"]
@@ -47,8 +59,8 @@ def validate_question_schema(mcq: Dict[str, Any]) -> None:
             raise QuestionValidationError(f"Seçenek {i} string değil.")
         if len(opt.strip()) < 1:
             raise QuestionValidationError(f"Seçenek {i} boş.")
-        if len(opt.strip()) > 200:
-            raise QuestionValidationError(f"Seçenek {i} çok uzun (200 karakter).")
+        if len(opt.strip()) > 300:
+            raise QuestionValidationError(f"Seçenek {i} çok uzun (300 karakter).")
 
     # 4) correct_option_index
     coi = mcq["correct_option_index"]
@@ -296,12 +308,85 @@ def normalize_mcq(raw: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
-def parse_and_normalize_mcq(raw_text: str) -> Dict[str, Any]:
-    parsed = safe_parse_llm_json(raw_text)
-    # Gerekirse burada loglama yapılabilir, şimdilik stdout'a basmıyoruz
-    # print("DEBUG PARSED FROM LLM:", parsed)
-    normalized = normalize_mcq(parsed)
+
+def normalize_open_ended(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Open-Ended soruları normalize eder.
+    {
+        "question": ...,
+        "answer": ...,
+        "explanation": ...,
+        ...
+    }
+    """
+    normalized = {}
+    
+    # 1) question
+    question = str(raw.get("question", "")).strip()
+    if not question:
+        question = str(raw.get("prompt", "")).strip()
+    if not question:
+         # Belki tek bir prompt field vardır
+         if "stem" in raw: question = raw["stem"]
+         
+    if not question:
+        raise ValueError("OpenEnded normalizasyonu: 'question' alanı boş.")
+    normalized["question"] = question
+
+    # 2) answer
+    answer = str(raw.get("answer", "")).strip()
+    if not answer:
+        # Belki 'ideal_answer' vs
+        answer = str(raw.get("ideal_answer", "")).strip()
+    if not answer:
+         # Fallback: explanation'ı answer yap
+         pass
+    
+    normalized["answer"] = answer
+    
+    # 3) explanation
+    explanation = str(raw.get("explanation", "")).strip()
+    if not explanation:
+        explanation = "Açıklama yok."
+    normalized["explanation"] = explanation
+    
     return normalized
+
+
+def parse_and_normalize_mcq(raw_text: str) -> Dict[str, Any]:
+    """
+    Adı 'mcq' kalsa da artık generic davranıyor.
+    """
+    parsed = safe_parse_llm_json(raw_text)
+    
+    # Tip tespiti logic güncellendi:
+    # 1) Eğer "answer_index" veya "correct_option_index" varsa -> KESİN MCQ
+    if "answer_index" in parsed or "correct_option_index" in parsed:
+        return normalize_mcq(parsed)
+
+    # 2) Eğer "answer" var VE "options" yoksa -> KESİN OPEN ENDED
+    if "answer" in parsed and "options" not in parsed:
+        return normalize_open_ended(parsed)
+
+    # 3) Eğer "answer" var ama "options" da varsa (Hallucinasyon durumu):
+    # Eğer answer string ise ve uzunsa muhtemelen Open Ended'dir.
+    if "answer" in parsed and isinstance(parsed["answer"], str) and len(parsed["answer"]) > 5:
+        # Ancak yine de emin olmalıyız. "Correct Answer: B" gibi bir string de olabilir.
+        ans_str = parsed["answer"].strip().lower()
+        if len(ans_str) < 3 and ans_str in ["a", "b", "c", "d"]:
+             return normalize_mcq(parsed)
+        return normalize_open_ended(parsed)
+
+    # 4) Eğer "options" varsa -> MCQ olarak dene (Index türetmeyi dener)
+    if "options" in parsed and isinstance(parsed["options"], list):
+        return normalize_mcq(parsed)
+        
+    # 5) Fallback: Eğer "answer" varsa -> Open Ended
+    if "answer" in parsed:
+        return normalize_open_ended(parsed)
+        
+    # Varsayılan
+    return normalize_mcq(parsed)
 
 
 # ------------------ Validation helper for generated questions ------------------ #

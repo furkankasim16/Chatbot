@@ -30,7 +30,9 @@ from app.domain.repositories.audit_repo import get_audit_stats
 from app.domain.schemas.question import QuestionModel
 from app.domain.schemas.audit import AuditLog
 from app.domain.schemas.audit import AuditLog
-from app.core.rag import rag_client
+# from app.core.rag import rag_client  <-- REMOVED
+from app.domain.services.rag_service import rag_service, clear_collection
+
 from app.services.pdf_service import pdf_service
 from starlette.concurrency import run_in_threadpool
 import hashlib
@@ -66,7 +68,7 @@ async def gen_question(
     topic: str,
     level: str,
     qtype: str = "mcq",  # "mcq", "true_false", "short_answer", "open_ended", "scenario"
-    model: LLMModel = LLMModel.OLLAMA_LOCAL,
+    model: str = "ollama:default",
     dry_run: bool = False,
     use_rag: bool = False,
     _=Depends(on_start_questions_db),
@@ -86,10 +88,8 @@ async def gen_question(
         try:
             # Topic tabanlı arama
             # n_results=3 genelde yeterli context oluşturur
-            results = rag_client.query(query_text=topic, n_results=3)
-            docs = results.get("documents", [])
-            if docs and docs[0]:
-                context = "\n\n".join(docs[0])
+            context = rag_service.retrieve_context(topic, collection_name="knowledge-base", n_results=3)
+            if context:
                 print(f"[RAG] Context found for topic '{topic}' ({len(context)} chars)")
             else:
                 print(f"[RAG] No context found for topic '{topic}'")
@@ -107,7 +107,7 @@ async def gen_question(
 
     # Yeni pipeline: LLM → JSON → QuestionModel → DB
     q: QuestionModel = await generate_question(
-        model_name=model.value,  # LLMModel enum → string
+        model_name=model,  # LLMModel enum → string
         params=params,
         save=not dry_run,
     )
@@ -127,7 +127,7 @@ async def gen_question(
             "level": level,
             "difficulty": difficulty,
             "qtype": qtype,
-            "model": model.value,
+            "model": model,
             "dry_run": dry_run,
         },
     )
@@ -377,15 +377,14 @@ async def generate_from_pdf(
         # Indexing (Blocking call, but fast for single PDF usually)
         # Note: If valid IDs conflict, it might error or update depending on Chroma version.
         # We can append a timestamp or random hash to IDs if versioning is needed.
-        rag_client.add_documents(chunks, metadatas, ids)
+        # Indexing (Blocking call, but fast for single PDF usually)
+        # Note: If valid IDs conflict, it might error or update depending on Chroma version.
+        # We can append a timestamp or random hash to IDs if versioning is needed.
+        rag_service.add_documents(chunks, metadatas, ids, collection_name="knowledge-base")
         
         # 2. Retrieve Context relevant to the *topic* from this PDF
         # We filter by filename to ensure we only generate from THIS PDF
-        results = rag_client.query(
-            query_text=topic,
-            n_results=5,
-            where={"source": file.filename}
-        )
+        context = rag_service.retrieve_context(topic, collection_name="knowledge-base", n_results=5)
         
         # Unpack results
         # results['documents'] is list of list of strings
@@ -435,3 +434,30 @@ async def generate_from_pdf(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"PDF işleme hatası: {str(e)}")
+
+from app.domain.repositories.users_repo import get_all_students_stats
+
+@router.get("/students")
+def list_students(
+    current_user: dict = Depends(require_admin),
+):
+    """
+    Returns statistics for all students (non-admins).
+    """
+    return get_all_students_stats()
+
+
+from app.domain.repositories.users_repo import get_student_details
+
+@router.get("/students/{user_id}/details")
+def get_student_details_endpoint(
+    user_id: int,
+    current_user: dict = Depends(require_admin),
+):
+    """
+    Returns details for a specific student.
+    """
+    details = get_student_details(user_id)
+    if not details:
+        raise HTTPException(status_code=404, detail="Student not found")
+    return details

@@ -79,17 +79,25 @@ async def _call_ollama_chat(
     model: str,
     messages: List[ChatMessage],
     temperature: float = 0.3,
+    **kwargs,
 ) -> Dict[str, Any]:
     base = str(settings.OLLAMA_URL).rstrip("/")
     url = f"{base}/api/chat"
+
+    # Default options
+    options = {
+        "temperature": temperature,
+        "num_ctx": 4096, # Ensure enough context
+    }
+    
+    # Merge extra options (top_k, top_p, repeat_penalty etc)
+    options.update(kwargs)
 
     payload = {
         "model": model,
         "messages": _normalize_messages(messages),
         "stream": False,
-        "options": {
-            "temperature": temperature,
-        },
+        "options": options,
     }
 
     async with _llm_sem:
@@ -125,6 +133,7 @@ async def _call_groq_chat(
     model: str,
     messages: List[ChatMessage],
     temperature: float = 0.3,
+    **kwargs,
 ) -> Dict[str, Any]:
     api_key = settings.GROQ_API_KEY
     if not api_key:
@@ -135,6 +144,8 @@ async def _call_groq_chat(
         "model": model,
         "messages": _normalize_messages(messages),
         "temperature": temperature,
+        # Groq might accept other params at top level or mismatched names, 
+        # for now ignoring kwargs to avoid 400 errors unless we map them explicitly.
     }
 
     headers = {
@@ -178,10 +189,10 @@ async def generate_chat_completion(
     model: str,
     messages: List[ChatMessage],
     temperature: float = 0.3,
+    **kwargs,
 ) -> Dict[str, Any]:
     """
-    Tek entry point: chat_service burayı çağırıyor.
-    Hata olursa HTTPException(502, ...) fırlatıyoruz ki frontend 502 görebilsin.
+    Tek entry point. **kwargs ile repeat_penalty, top_p vb. geçilebilir.
     """
     try:
         if provider == "ollama":
@@ -189,15 +200,17 @@ async def generate_chat_completion(
                 model=model,
                 messages=messages,
                 temperature=temperature,
+                **kwargs,
             )
         elif provider in ("groq", "grok"):
             return await _call_groq_chat(
                 model=model,
                 messages=messages,
                 temperature=temperature,
+                **kwargs,
             )
         elif provider == "mock":
-            await asyncio.sleep(2.0) # 2 saniye bekle (işlem simülasyonu)
+            await asyncio.sleep(2.0)
             return {
                 "content": "Bu bir MOCK (sahte) cevaptır. Sistem yük testindedir.",
                 "usage": {"model": "mock-test"},

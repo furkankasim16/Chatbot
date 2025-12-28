@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { HomeScreen } from "@/components/home-screen"
 import { QuizInterface } from "@/components/quiz-interface"
 import { FeedbackScreen } from "@/components/feedback-screen"
@@ -11,8 +12,10 @@ import { AdminPanel } from "@/components/admin-panel"
 import { UserMenu } from "@/components/user-menu"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { ChatScreen } from "@/components/chat-screen"
+import { LeaderboardScreen } from "@/components/leaderboard-screen"
+import { KnowledgeBaseUploadModal } from "@/components/knowledge-base-upload-modal"
 import { useQuizTimer } from "@/hooks/use-quiz-timer"
-import type { Question, QuestionType } from "@/app/types/quiz"
+import type { Question, QuestionType, QuizMode, Difficulty, QuizConfig } from "@/app/types/quiz"
 import type {
   Question as APIQuestion,
   UserStats,
@@ -31,26 +34,20 @@ import {
   endQuizTiming,
   startQuestionTiming,
   endQuestionTiming,
+  submitQuizResult,
 } from "@/lib/api"
 
 import { Loader2, AlertCircle, Sparkles, Clock } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-
-export type QuizMode = "quick" | "daily" | "scenario"
-export type Difficulty = "beginner" | "intermediate" | "advanced" | "mixed"
-
-export interface QuizConfig {
-  mode: QuizMode
-  topic: string
-  difficulty: Difficulty
-  useOllama?: boolean
-}
+import { useToast } from "@/components/ui/use-toast"
 
 interface ExtendedLoginResponse extends LoginResponse {
   is_admin: boolean
   user_id?: number
+  xp?: number
+  level?: number
 }
 
 type QuestionResultDetail = {
@@ -70,8 +67,10 @@ type QuestionResultDetail = {
 }
 
 export default function QuizWidget() {
+  const { toast } = useToast()
+  const router = useRouter()
   const [screen, setScreen] = useState<
-    "auth" | "home" | "quiz" | "feedback" | "results" | "stats" | "admin" | "chat"
+    "auth" | "home" | "quiz" | "feedback" | "results" | "stats" | "admin" | "chat" | "leaderboard"
   >("auth")
   const [config, setConfig] = useState<QuizConfig | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -97,13 +96,14 @@ export default function QuizWidget() {
   >({})
 
   const [detailedResults, setDetailedResults] = useState<QuestionResultDetail[] | null>(null)
+  const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState(false)
 
   useEffect(() => {
     const savedToken = localStorage.getItem("auth_token")
     const savedUsername = localStorage.getItem("username")
     const savedIsAdmin = localStorage.getItem("is_admin") === "true"
 
-    if (savedToken && savedUsername) {
+    if (savedToken && savedToken !== "undefined" && savedUsername) {
       setUser({
         access_token: savedToken,
         token_type: "bearer",
@@ -148,7 +148,17 @@ export default function QuizWidget() {
       const stats = await getUserStats(token)
       setUserStats(stats)
     } catch (error) {
-      console.error("[v0] Failed to load user stats:", error)
+      console.error("[v0] Failed to load user stats (using default 0s):", error)
+      // Fallback to empty stats so screen renders
+      setUserStats({
+        total_quizzes: 0,
+        total_questions: 0,
+        correct_answers: 0,
+        total_quiz_duration_ms: 0,
+        avg_quiz_duration_ms: 0,
+        avg_question_duration_ms: 0,
+        last_quiz_date: null,
+      } as any)
     }
   }
 
@@ -398,10 +408,21 @@ export default function QuizWidget() {
           ? answer.map((ans, idx) => `Step ${idx + 1}: ${ans}`).join("\n")
           : String(answer)
 
-        const result = await evaluateAnswer(user.access_token, q.stem, rawCorrect, userText)
+        // [OPTIMIZATION] If answer is empty (Skipped), do not call LLM. Just mark as wrong.
+        if (!userText.trim()) {
+          evalResult = {
+            score: 0,
+            is_correct: false,
+            feedback: "Soruyu boş bıraktınız.",
+            rubric: [],
+          }
+          setEvalResults((prev) => ({ ...prev, [key]: evalResult! }))
+        } else {
+          const result = await evaluateAnswer(user.access_token, q.stem, rawCorrect, userText)
+          evalResult = result
+          setEvalResults((prev) => ({ ...prev, [key]: result }))
+        }
 
-        evalResult = result
-        setEvalResults((prev) => ({ ...prev, [key]: result }))
       } catch (err) {
         console.error("[v0] evaluateAnswer (per-question) failed:", err)
       }
@@ -529,14 +550,27 @@ export default function QuizWidget() {
 
       if (quizAttemptId) {
         try {
-          await endQuizTiming(user.access_token, {
-            attempt_id: quizAttemptId,
+          const result = await submitQuizResult(user.access_token, {
+            topic: config.topic,
+            difficulty: config.difficulty,
+            total_questions: totalQuestionsInResult,
             correct_answers: correctCount,
             score,
-            client_end_time: new Date().toISOString(),
-            total_duration_ms: timer.totalQuizTime,
+            completed_at: new Date().toISOString(),
             questions_attempted: JSON.stringify(detailedQuestions),
           })
+
+          if (result) {
+            // Update local state
+            setUser(prev => prev ? ({ ...prev, xp: result.total_xp, level: result.new_level }) : null)
+
+            toast({
+              title: "Quiz Tamamlandı! 🎉",
+              description: `${result.xp_gained} XP kazandın! ${result.level_up ? "TEBRİKLER! SEVİYE ATLADIN! 🆙" : ""}`,
+              variant: result.level_up ? "default" : "default", // Maybe gold color for level up?
+            })
+          }
+
         } catch (error) {
           console.error("[v0] Failed to finalize quiz attempt:", error)
         }
@@ -579,13 +613,9 @@ export default function QuizWidget() {
   }
 
   const handleRegister = async (username: string, email: string, password: string) => {
-    const response = await register(username, email, password)
-    setUser(response)
-    localStorage.setItem("auth_token", response.access_token)
-    localStorage.setItem("username", response.username)
-    localStorage.setItem("is_admin", String(response.is_admin))
-    setScreen("home")
-    await loadUserStats(response.access_token)
+    await register(username, email, password)
+    // Auto-login to get the token
+    await handleLogin(username, password)
   }
 
   const handleLogout = () => {
@@ -595,11 +625,14 @@ export default function QuizWidget() {
     localStorage.removeItem("username")
     localStorage.removeItem("is_admin")
     setScreen("auth")
-    handleRestart()
+    // Force reload to clear all states and Ensure distinct separation
+    window.location.reload()
   }
 
   const handleViewStats = () => setScreen("stats")
+  const handleViewLeaderboard = () => setScreen("leaderboard")
   const handleViewAdminPanel = () => setScreen("admin")
+  const handleViewTeacherPanel = () => router.push("/teacher")
 
   const currentQuestion = questions[currentQuestionIndex]
 
@@ -654,8 +687,13 @@ export default function QuizWidget() {
               <UserMenu
                 username={user.username}
                 isAdmin={user.is_admin || false}
+                xp={user.xp}
+                level={user.level}
                 onViewStats={handleViewStats}
+                onViewLeaderboard={handleViewLeaderboard}
                 onViewAdminPanel={handleViewAdminPanel}
+                onViewTeacherPanel={handleViewTeacherPanel}
+                onViewKnowledgeBase={() => setShowKnowledgeBaseModal(true)}
                 onLogout={handleLogout}
               />
             )}
@@ -666,6 +704,10 @@ export default function QuizWidget() {
 
         {screen === "stats" && userStats && user && (
           <StatsScreen stats={userStats} token={user.access_token} onBack={() => setScreen("home")} />
+        )}
+
+        {screen === "leaderboard" && (
+          <LeaderboardScreen onBack={() => setScreen("home")} />
         )}
 
         {screen === "admin" && user && (
@@ -735,6 +777,10 @@ export default function QuizWidget() {
             questionNumber={currentQuestionIndex + 1}
             totalQuestions={config?.mode === "daily" ? 1 : config?.mode === "quick" ? 5 : 3}
             onSubmit={handleAnswerSubmit}
+            onSkip={() => handleAnswerSubmit(questions[currentQuestionIndex]!.id ?? "unknown", "")}
+            onFinish={handleRestart}
+            onHint={() => alert("💡 İpucu: Sorunun köküne ve anahtar kelimelere odaklan!")}
+            onGiveUp={() => handleAnswerSubmit(questions[currentQuestionIndex]!.id ?? "unknown", "GIVE_UP")}
             questionTime={timer.currentQuestionTime}
             formatTime={timer.formatTime}
           />
@@ -760,6 +806,13 @@ export default function QuizWidget() {
             onRestart={handleRestart}
           />
         )}
+
+        {/* Knowledge Base Modal */}
+        <KnowledgeBaseUploadModal
+          isOpen={showKnowledgeBaseModal}
+          onClose={() => setShowKnowledgeBaseModal(false)}
+          token={user?.access_token || ""}
+        />
       </div>
     </div>
   )

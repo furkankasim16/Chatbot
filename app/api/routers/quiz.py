@@ -155,9 +155,9 @@ class QuizAttemptHistoryOut(BaseModel):
     quiz_date: str
     topic: Optional[str] = None
     difficulty: Optional[str] = None
-    total_questions: int
-    correct_answers: int
-    score: float
+    total_questions: Optional[int] = 0
+    correct_answers: Optional[int] = 0
+    score: Optional[float] = 0.0
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     total_duration_ms: Optional[int] = None
@@ -247,11 +247,37 @@ def _normalize_q(q: Any) -> Dict[str, Any]:
     if not y.get("question"):
         y["question"] = "—"
 
+    # --- Fix for Missing Answer Fields (MCQ/TF) ---
+    # QuestionModel uses 'correct_option_indexes' or 'correct_answer', but API expects 'answer_index' or 'answer'
+    
+    # 1. MCQ: Map correct_option_indexes[0] -> answer_index
+    if y.get("answer_index") is None:
+        idxs = y.get("correct_option_indexes")
+        if isinstance(idxs, list) and idxs:
+             y["answer_index"] = idxs[0]
+
+    # 2. True/False: Map correct_answer -> answer (Localized)
+    qtype_val = y.get("type") or y.get("qtype") or ""
+    if str(qtype_val) == "true_false":
+        # Force Turkish options for T/F if missing
+        if not y.get("options"):
+            y["options"] = ["Doğru", "Yanlış"]
+        
+        # correct_answer is bool (True/False). Map to options.
+        # Default assumption: True -> "Doğru", False -> "Yanlış"
+        chk_val = y.get("correct_answer")
+        if chk_val is True:
+            y["answer"] = "Doğru"
+            y["answer_index"] = 0
+        elif chk_val is False:
+            y["answer"] = "Yanlış"
+            y["answer_index"] = 1
+            
     # options/choices uyumu
     if not y.get("options") and y.get("choices"):
         y["options"] = y["choices"]
 
-    # answer derivation
+    # answer derivation (fallback for MCQ if answer is still none)
     options = y.get("options")
     if y.get("answer") is None and isinstance(options, list):
         ans_idx = y.get("answer_index")
@@ -670,3 +696,172 @@ def get_recent_attempts(limit: int = 10, current_user=Depends(get_current_user))
         )
 
     return out
+
+
+# --------------------------
+# Answer Submission (Run Loop)
+# --------------------------
+class AnswerIn(BaseModel):
+    attempt_id: int
+    question_id: Union[int, str]
+    answer: Union[str, List[str]]
+    client_duration_ms: Optional[int] = None
+
+@router.post("/answer")
+async def submit_answer(payload: AnswerIn, current_user=Depends(get_current_user)):
+    user_id = _uid(current_user)
+    
+    # 1. Get Question from DB
+    q_model = None
+    with app_cursor() as c:
+        # Verify attempt ownership
+        att = c.execute("SELECT * FROM quiz_attempts WHERE id=? AND user_id=?", (payload.attempt_id, user_id)).fetchone()
+        if not att:
+             raise HTTPException(404, "Attempt not found")
+        
+    # We need to fetch question details from Questions DB to evaluate
+    from app.domain.repositories.quesitons_repo import questions_cursor, _row_to_question_model
+    
+    with questions_cursor() as qc:
+        q_row = qc.execute("SELECT * FROM questions WHERE id=?", (payload.question_id,)).fetchone()
+        if q_row:
+            q_model = _row_to_question_model(q_row)
+
+    if not q_model:
+        raise HTTPException(404, "Question not found")
+
+    is_skipped = (payload.answer == "SKIPPED")
+    
+    score = 0.0
+    is_correct = False
+    feedback = "Boş bırakıldı."
+    
+    # 2. Evaluate (if not skipped)
+    if not is_skipped:
+        # Convert List[str] to string if needed (for simple text eval)
+        user_ans_str = payload.answer
+        if isinstance(user_ans_str, list):
+            user_ans_str = ", ".join(user_ans_str)
+            
+        # Determine expected answer text
+        expected_text = ""
+        if q_model.question_type == QuestionType.MCQ:
+             # Find correct option text
+             if q_model.correct_option_indexes and q_model.options:
+                 idx = q_model.correct_option_indexes[0]
+                 if 0 <= idx < len(q_model.options):
+                     expected_text = q_model.options[idx]
+        elif q_model.question_type == QuestionType.TRUE_FALSE:
+             expected_text = "Doğru" if q_model.correct_answer else "Yanlış"
+        elif q_model.question_type == QuestionType.SHORT_ANSWER:
+             expected_text = q_model.accepted_answers[0] if q_model.accepted_answers else ""
+        elif q_model.question_type == QuestionType.OPEN_ENDED:
+             # Just pass empty, LLM evaluates based on rubric/question
+             pass
+             
+        # Call LLM or simple check
+        # Optimization: MCQ/TF checks can be done locally without LLM
+        if q_model.question_type in [QuestionType.MCQ, QuestionType.TRUE_FALSE]:
+            # Simple string match
+            # Normalize both
+            if _normalize_answer(str(user_ans_str)) == _normalize_answer(str(expected_text)):
+                score = 100.0
+                is_correct = True
+                feedback = "Tebrikler, doğru cevap!"
+            else:
+                score = 0.0
+                is_correct = False
+                feedback = f"Yanlış. Doğru cevap: {expected_text}"
+        else:
+             # LLM Evaluation for Open/Scenario/Short
+             try:
+                 eval_res = await llm_service.evaluate_answer_with_rubric(
+                     question=q_model.stem,
+                     expected_answer=expected_text,
+                     user_answer=str(user_ans_str),
+                     model=LLMModel.OLLAMA_LOCAL
+                 )
+                 score = eval_res.score
+                 is_correct = eval_res.is_correct
+                 feedback = eval_res.feedback
+             except Exception:
+                 # Fallback
+                 score = 0
+                 is_correct = False
+                 feedback = "Değerlendirme servisine erişilemedi."
+                 
+    # 3. Save Progress (Atomic Update)
+    # We append this result to 'questions_attempted' list in quiz_attempts
+    # Need to read, append, write.
+    
+    next_q = None
+    is_completed = False
+    
+    with app_cursor() as c:
+        row = c.execute("SELECT questions_attempted, total_questions, topic, difficulty FROM quiz_attempts WHERE id=?", (payload.attempt_id,)).fetchone()
+        curr_json = row[0]
+        total_q = row[1]
+        topic = row[2]
+        difficulty_level = row[3] # "easy", "medium", "hard" or raw
+        
+        history = []
+        if curr_json:
+            try:
+                history = json.loads(curr_json)
+            except:
+                history = []
+        
+        # Add current result
+        result_blob = {
+            "question_id": str(payload.question_id),
+            "stem": q_model.stem,
+            "user_answer": payload.answer,
+            "correct_answer": expected_text if not is_skipped else "SKIPPED",
+            "is_correct": is_correct,
+            "eval_score": score,
+            "eval_feedback": feedback
+        }
+        history.append(result_blob)
+        
+        # Check completion
+        if len(history) >= total_q:
+            is_completed = True
+        
+        # Update DB
+        new_json = json.dumps(history, ensure_ascii=False)
+        
+        # Recalculate total score/correct
+        total_correct = sum(1 for h in history if h.get("is_correct"))
+        avg_score = sum(h.get("eval_score", 0) for h in history) / len(history) if history else 0
+        
+        c.execute("""
+            UPDATE quiz_attempts 
+            SET questions_attempted=?, correct_answers=?, score=? 
+            WHERE id=?
+        """, (new_json, total_correct, avg_score, payload.attempt_id))
+        
+        # 4. Pick Next Question (if not completed)
+        if not is_completed:
+            # Find a question NOT in history
+            exclude_ids = [int(h["question_id"]) for h in history if "question_id" in h]
+            
+            # Map difficulty string to DB difficulty if needed
+            # Assuming 'difficulty_level' from attempts table matches DB values (easy/medium/hard)
+            db_diff = map_level_to_db_difficulty(difficulty_level) 
+            
+            next_q_model = get_random(topic=topic, difficulty=db_diff, exclude_ids=exclude_ids)
+            if next_q_model:
+                next_q = _normalize_q(next_q_model)
+            else:
+                # No more questions available -> force complete
+                is_completed = True
+
+    return {
+        "processed": True,
+        "is_correct": is_correct,
+        "score": score,
+        "feedback": feedback,
+        "next_question": next_q,
+        "completed": is_completed
+    }
+

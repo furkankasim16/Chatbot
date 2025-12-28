@@ -7,7 +7,7 @@ export interface UseQuizTimerReturn {
   currentQuestionTime: number
   isQuizActive: boolean
   isPaused: boolean
-  pauseReason: "hidden" | "idle" | null
+  pauseReason: "hidden" | "idle" | "submitting" | null
   quizStartTime: number | null
   questionStartTime: number | null
   isQuestionActive: boolean
@@ -15,7 +15,7 @@ export interface UseQuizTimerReturn {
   endQuiz: () => void
   startQuestion: (questionId: string) => void
   endQuestion: () => void
-  pause: (reason: "hidden" | "idle") => void
+  pause: (reason: "hidden" | "idle" | "submitting") => void
   resume: () => void
   formatTime: (ms: number) => string
   reset: () => void
@@ -24,7 +24,7 @@ export interface UseQuizTimerReturn {
 export function useQuizTimer(): UseQuizTimerReturn {
   const [isQuizActive, setIsQuizActive] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
-  const [pauseReason, setPauseReason] = useState<"hidden" | "idle" | null>(null)
+  const [pauseReason, setPauseReason] = useState<"hidden" | "idle" | "submitting" | null>(null)
   const [totalQuizTime, setTotalQuizTime] = useState(0)
   const [currentQuestionTime, setCurrentQuestionTime] = useState(0)
 
@@ -152,7 +152,7 @@ export function useQuizTimer(): UseQuizTimerReturn {
     questionStartTimeRef.current = null
   }, [])
 
-  const pause = useCallback((reason: "hidden" | "idle") => {
+  const pause = useCallback((reason: "hidden" | "idle" | "submitting") => {
     if (!isQuizActive || isPaused) return
     pauseStartTimeRef.current = Date.now()
     setIsPaused(true)

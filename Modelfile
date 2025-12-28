@@ -1,0 +1,22 @@
+
+FROM ./unsloth.Q4_K_M.gguf
+
+# Model Parameters
+PARAMETER temperature 0.3
+PARAMETER top_p 0.9
+PARAMETER stop "<|start_header_id|>"
+PARAMETER stop "<|end_header_id|>"
+PARAMETER stop "<|eot_id|>"
+PARAMETER stop "<|reserved_special_token"
+
+# System Prompt (Default - will be overridden by app)
+SYSTEM """Sen QuizBot Asistanı'sın. Türkçe konuşan, yardımsever ve öğretici bir yapay zeka asistanısın."""
+
+# Template (Llama 3 format)
+TEMPLATE """{{ if .System }}<|start_header_id|>system<|end_header_id|>
+
+{{ .System }}<|eot_id|>{{ end }}{{ if .Prompt }}<|start_header_id|>user<|end_header_id|>
+
+{{ .Prompt }}<|eot_id|>{{ end }}<|start_header_id|>assistant<|end_header_id|>
+
+{{ .Response }}<|eot_id|>"""

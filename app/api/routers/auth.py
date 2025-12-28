@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -28,6 +28,7 @@ class TokenResponse(BaseModel):
     is_admin: bool
 
 class UserStats(BaseModel):
+    id: int # 🆕 Add ID
     total_quizzes: int
     total_questions: int
     correct_answers: int
@@ -47,6 +48,9 @@ class UserStats(BaseModel):
 
 
 # ---------- Auth helpers ----------
+import logging
+logger = logging.getLogger("app.auth")
+
 def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
     with app_cursor() as c:
         row = c.execute(
@@ -54,9 +58,13 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
             (username,),
         ).fetchone()
     if not row:
+        logger.warning(f"Login failed: User '{username}' not found.")
         return None
     if not verify_password(password, row["hashed_password"]):
+        logger.warning(f"Login failed: Invalid password for user '{username}'.")
         return None
+    
+    logger.info(f"User '{username}' logged in successfully.")
     return {"id": row["id"], "username": row["username"], "is_admin": bool(row["is_admin"])}
 
 @router.get("/me")
@@ -166,6 +174,7 @@ def user_stats(current=Depends(get_current_user)):
          recommendations = ["Tebrikler! Tüm konularda performansın iyi.", "Zorluğu artırmayı dene."]
 
     return {
+        "id": user_id, # 🆕 Return ID
         "total_quizzes": int(tq[0]),
         "total_questions": int(tq[1]),
         "correct_answers": int(tq[2]),
@@ -216,7 +225,30 @@ def submit_result(current=Depends(get_current_user), payload: Dict[str, Any] | N
             """,
             (current["id"], quiz_date, topic, difficulty, total_questions, correct_answers, score, questions_attempted, quiz_date)
         )
-    return {"ok": True}
+    
+    # --- GAMIFICATION: Award XP ---
+    # Hatasiz kul olmaz, ama dogru cevap 10 XP olsun. Quiz bitirme bonusu 20 XP.
+    xp_gained = (correct_answers * 10) + 20
+    from app.domain.repositories.users_repo import add_xp
+    xp_result = add_xp(current["id"], xp_gained)
+    
+    return {
+        "ok": True, 
+        "xp_gained": xp_gained, 
+        "new_level": xp_result["new_level"],
+        "level_up": xp_result["level_up"],
+        "total_xp": xp_result["total_xp"]
+    }
 
 
 
+
+@router.get("/leaderboard")
+def get_leaderboard(limit: int = 10):
+    """
+    XP'ye gore sirali liderlik tablosu.
+    """
+    from app.domain.repositories.users_repo import get_top_users
+    return get_top_users(limit)
+
+UserStats.model_rebuild()

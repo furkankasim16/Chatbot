@@ -9,7 +9,7 @@ CORPUS_DIR = DATA_DIR / "corpus"
 
 # ---- Yazılabilir depolama ----
 STORAGE_DIR = ROOT / "storage"
-CHROMA_DIR = STORAGE_DIR / "chroma"
+CHROMA_DIR = STORAGE_DIR / "chroma_v2" # 🚀 Migrated to v2 to bypass corruption
 DB_DIR = STORAGE_DIR / "db"
 DB_BACKUP_DIR = DB_DIR / "backups"
 

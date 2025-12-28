@@ -39,7 +39,7 @@ CHAT_MODES: Dict[ChatMode, ChatModeConfig] = {
         description="Seçtiğin topic üzerinde adım adım, seviyene uygun anlatım ve soru cevap.",
         provider="ollama",
         model=TUTOR_MODEL,
-        temperature=0.6,
+        temperature=0.3, # Balanced
         max_history=16,
     ),
     ChatMode.PLAYGROUND: ChatModeConfig(
@@ -48,8 +48,8 @@ CHAT_MODES: Dict[ChatMode, ChatModeConfig] = {
         description="Serbest teknik sohbet ve denemeler için kullanılabilecek mod.",
         provider="ollama",
         model=PLAYGROUND_MODEL,
-        temperature=0.8,
-        max_history=12,
+        temperature=0.5, # Reduced from 0.7 for coherence
+        max_history=10, 
     ),
     ChatMode.REVIEW: ChatModeConfig(
         id=ChatMode.REVIEW,

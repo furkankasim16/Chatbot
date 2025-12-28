@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     OLLAMA_URL: AnyHttpUrl = "http://localhost:11434"
-    OLLAMA_MODEL : str = "llama3:instruct"
+    OLLAMA_MODEL : str = "qwen2.5:32b" # 🚀 Upgrade to 32B (High Intelligence, Slow Inference)
     OLLAMA_MODEL_TUTOR: Optional[str] = None
     OLLAMA_MODEL_PLAYGROUND: Optional[str] = None
     OLLAMA_MODEL_REVIEW: Optional[str] = None

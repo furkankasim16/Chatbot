@@ -23,11 +23,24 @@ def init_app_db():
         CREATE TABLE IF NOT EXISTS users(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT UNIQUE NOT NULL,
-          email TEXT UNIQUE NOT NULL,l
+          email TEXT UNIQUE NOT NULL,
           hashed_password TEXT NOT NULL,
           is_admin INTEGER DEFAULT 0,
+          xp INTEGER DEFAULT 0,
+          level INTEGER DEFAULT 1,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""")
+        
+        # Migration: Add xp/level columns if they don't exist
+        try:
+            c.execute("ALTER TABLE users ADD COLUMN xp INTEGER DEFAULT 0")
+        except:
+            pass
+            
+        try:
+            c.execute("ALTER TABLE users ADD COLUMN level INTEGER DEFAULT 1")
+        except:
+            pass
         c.execute("""
         CREATE TABLE IF NOT EXISTS quiz_attempts(
           id INTEGER PRIMARY KEY AUTOINCREMENT,

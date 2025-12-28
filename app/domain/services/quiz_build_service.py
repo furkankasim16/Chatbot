@@ -3,6 +3,9 @@
 from typing import Any, Dict, List, Optional
 
 from app.domain.repositories.quesitons_repo import get_random, map_level_to_db_difficulty
+import logging
+
+logger = logging.getLogger("app.quiz_builder")
 
 
 def _get_id_safe(q: Any) -> Optional[int]:
@@ -139,20 +142,22 @@ def normalize_question(q: Any) -> Dict[str, Any]:
     return y
 
 
-def build_quiz_from_db(
+async def build_quiz_from_db(
     topic: str,
     level: str = "beginner",
     n: int = 5,
 ) -> List[Dict[str, Any]]:
     """
-    DB'den n adet soru çeker, exclude ile tekrarları engeller,
-    normalize edilmiş dict listesi döner.
+    DB'den n adet soru çeker. Yetersizse LLM ile üretir.
     """
     exclude: List[int] = []
     out: List[Dict[str, Any]] = []
 
     db_difficulty = map_level_to_db_difficulty(level)
 
+    logger.info(f"Building Quiz | Topic: {topic} | Level: {level} | Target: {n}")
+    
+    # 1. Try DB
     for _ in range(n):
         q = get_random(
             topic=topic,
@@ -168,4 +173,32 @@ def build_quiz_from_db(
 
         out.append(normalize_question(q))
 
+    # 2. Fallback to LLM if insufficient
+    if len(out) < n:
+        missing = n - len(out)
+        logger.warning(f"Quiz Incomplete | Found: {len(out)} | Generating {missing} via LLM...")
+        
+        # Call LLM Service to generate missing questions
+        from app.domain.services.llm_service import generate_quiz_questions_llm
+        from app.domain.repositories.quesitons_repo import add_question
+        from app.domain.schemas.question import QuestionCreate
+        
+        try:
+            generated = await generate_quiz_questions_llm(topic, level, missing)
+            for g in generated:
+                # Convert dict to pydantic
+                q_in = QuestionCreate(
+                    topic=topic,
+                    level=level,
+                    content=g["content"], # mapped from text/question
+                    options=g["options"],
+                    answer=g["answer"],
+                    explanation=g.get("explanation", "")
+                )
+                created = add_question(q_in)
+                out.append(normalize_question(created))
+        except Exception as e:
+            logger.error(f"Failed to generate fallback questions: {e}")
+            
+    logger.info(f"Quiz Built Successfully | Count: {len(out)}")
     return out

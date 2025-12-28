@@ -26,6 +26,7 @@ export interface ChatTurnRequest {
   history?: ChatMessage[]
   session_id?: string | null
   use_rag?: boolean
+  language?: string // 🆕 Language
 }
 
 export interface ChatTurnResponse {
@@ -99,6 +100,8 @@ export interface LoginResponse {
   token_type: string
   username: string
   is_admin: boolean
+  xp?: number
+  level?: number
 }
 
 export interface RegisterRequest {
@@ -113,6 +116,7 @@ export interface TopicStatsEntry {
 }
 
 export interface UserStats {
+  id: number
   total_quizzes: number
   total_questions: number
   correct_answers: number
@@ -133,6 +137,7 @@ export interface QuizResult {
   correct_answers: number
   completed_at: string
   questions_attempted?: string
+  score?: number
 }
 
 export interface QuizAttempt {
@@ -540,10 +545,18 @@ export async function getUserStats(token: string): Promise<UserStats> {
   return stats
 }
 
+export interface SubmitQuizResponse {
+  ok: boolean
+  xp_gained: number
+  new_level: number
+  level_up: boolean
+  total_xp: number
+}
+
 export async function submitQuizResult(
   token: string,
   result: QuizResult,
-): Promise<void> {
+): Promise<SubmitQuizResponse | null> {
   console.log("[v0] submitQuizResult called")
   console.log("[v0] API URL:", `${API}/auth/submit-result`)
   console.log("[v0] Result data:", result)
@@ -567,6 +580,19 @@ export async function submitQuizResult(
 
   const responseData = await res.json().catch(() => null)
   console.log("[v0] submitQuizResult response data:", responseData)
+  return responseData
+}
+
+export interface LeaderboardEntry {
+  username: string
+  xp: number
+  level: number
+}
+
+export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+  const res = await fetch(`${API}/auth/leaderboard`)
+  if (!res.ok) throw new Error("Liderlik tablosu alınamadı")
+  return res.json()
 }
 
 export async function generateRandomQuestion(
@@ -586,6 +612,32 @@ export async function generateRandomQuestion(
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: "Soru üretilemedi" }))
     throw new Error(error.detail || "Soru üretilemedi")
+  }
+
+  return res.json()
+}
+
+// 🔹 RAG / Knowledge Base
+export async function uploadDocument(
+  token: string,
+  file: File,
+  topic: string = "general",
+): Promise<any> {
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("topic", topic)
+
+  const res = await fetch(`${API}/rag/index`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Yükleme başarısız" }))
+    throw new Error(error.detail || "Dosya yüklenemedi")
   }
 
   return res.json()
@@ -1218,3 +1270,70 @@ export async function getChatModes(token: string): Promise<Record<string, ChatMo
   return res.json()
 }
 
+
+
+export interface StudentStats {
+  id: number
+  username: string
+  email: string
+  level: number
+  xp: number
+  total_quizzes: number
+  avg_score: number
+}
+
+export async function getStudents(token: string): Promise<StudentStats[]> {
+  const res = await fetch(`${API}/admin/students`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Öğrenci listesi alınamadı")
+  return res.json()
+}
+
+
+export interface StudentDetail {
+  user: {
+    id: number
+    username: string
+    email: string
+    level: number
+    xp: number
+  }
+  weak_topics: {
+    topic: string
+    accuracy: number
+    total: number
+  }[]
+  recent_activity: {
+    id: number
+    topic: string
+    difficulty: string
+    score: number
+    date: string
+  }[]
+  all_topics: {
+    topic: string
+    accuracy: number
+    total: number
+  }[]
+}
+
+export async function getStudentDetails(token: string, userId: number): Promise<StudentDetail> {
+  const res = await fetch(`${API}/admin/students/${userId}/details`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Öğrenci detayı alınamadı")
+  return res.json()
+}
+
+export interface LlmModelInfo {
+  id: string
+  name: string
+  provider: string
+}
+
+export async function getAvailableModels(): Promise<LlmModelInfo[]> {
+  const res = await fetch(`${CHAT_API}/models`)
+  if (!res.ok) throw new Error("Model listesi alınamadı")
+  return res.json()
+}

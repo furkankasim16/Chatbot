@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Zap, Calendar, GitBranch, Clock, Loader2, Sparkles } from "lucide-react"
-import type { QuizMode, Difficulty, QuizConfig } from "@/app/page"
+import type { QuizMode, Difficulty, QuizConfig } from "@/app/types/quiz"
 import { getTopics } from "@/lib/api"
 import useSWR from "swr"
 

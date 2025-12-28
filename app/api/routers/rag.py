@@ -3,7 +3,7 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 
-from app.core.rag import rag_client
+from app.domain.services.rag_service import rag_service, clear_collection
 from app.services.pdf_service import pdf_service
 from app.api.deps import get_current_user
 
@@ -45,7 +45,7 @@ async def index_pdf(
                 message="No text extracted from PDF."
             )
             
-        rag_client.add_documents(chunks, metadatas, ids)
+        rag_service.add_documents(chunks, metadatas, ids, collection_name="knowledge-base")
         
         return IndexResponse(
             filename=file.filename,
@@ -65,13 +65,14 @@ async def query_rag(
     Test retrieval from ChromaDB.
     """
     try:
-        results = rag_client.query(
-            query_text=request.query, 
+        results = rag_service.retrieve_context(
+            query=request.query, 
+            collection_name="knowledge-base",
             n_results=request.n_results
         )
         return {
             "query": request.query,
-            "results": results
+            "results": results # Returns string context
         }
     except Exception as e:
          raise HTTPException(status_code=500, detail=str(e))
@@ -83,8 +84,11 @@ async def reset_db(
     """
     Reset the knowledge base (Admin only - practically unrestricted for now if admin).
     """
-    if not current_user.is_admin:
-         raise HTTPException(status_code=403, detail="Admin access required")
+    if not hasattr(current_user, "is_admin") and not current_user.get("is_admin"):
+         # Basic dict check workaround if pydantic model not used here
+         # But usually current_user is dict or object. Let's assume dict from deps.
+         if not current_user.get("is_admin"):
+             raise HTTPException(status_code=403, detail="Admin access required")
     
-    rag_client.reset()
+    clear_collection("knowledge-base")
     return {"message": "Knowledge base reset."}

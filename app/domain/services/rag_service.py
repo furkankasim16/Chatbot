@@ -97,32 +97,136 @@ class RAGService:
         logger.info(f"Indexed {len(chunks)} chunks from {filename} into '{collection_name}'")
         return len(chunks)
 
-    def retrieve_context(self, query: str, collection_name: str, n_results: int = 3) -> str:
+        return len(chunks)
+
+    def add_documents(self, documents: List[str], metadatas: List[dict], ids: List[str], collection_name: str = "knowledge-base"):
+        """
+        Directly add processed chunks to Chroma.
+        """
+        client = get_chroma_client()
+        collection = client.get_or_create_collection(name=collection_name)
+        
+        model = get_embed_model()
+        embeddings = model.encode(documents).tolist()
+        
+        collection.add(
+            documents=documents,
+            embeddings=embeddings,
+            metadatas=metadatas,
+            ids=ids
+        )
+
+    def index_text(self, text: str, collection_name: str, metadata: dict = None) -> bool:
+        """
+        Indexes a single text string (e.g., a question) into ChromaDB.
+        """
+        if not text or not text.strip():
+            return False
+
+        try:
+            client = get_chroma_client()
+            collection = client.get_or_create_collection(name=collection_name)
+            model = get_embed_model()
+            
+            embeddings = model.encode([text])
+            
+            import hashlib
+            text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+            doc_id = f"text_{text_hash}"
+            
+            if metadata:
+                metadata["hash"] = text_hash
+            else:
+                metadata = {"hash": text_hash}
+
+            collection.add(
+                documents=[text],
+                embeddings=embeddings.tolist(),
+                metadatas=[metadata],
+                ids=[doc_id]
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to index text: {e}")
+            return False
+
+    def find_similar(self, text: str, collection_name: str, k: int = 3, threshold: float = 0.0) -> List[str]:
+        """
+        Finds similar texts. Returns list of document strings.
+        Threshold: if set, only return results with distance < threshold (L2).
+        """
+        try:
+            client = get_chroma_client()
+            try:
+                collection = client.get_collection(name=collection_name)
+            except ValueError:
+                return [] 
+
+            model = get_embed_model()
+            query_embedding = model.encode([text]).tolist()
+            
+            results = collection.query(
+                query_embeddings=query_embedding,
+                n_results=k
+            )
+            
+            documents = results.get("documents", [[]])[0]
+            distances = results.get("distances", [[]])[0]
+            
+            matches = []
+            for doc, dist in zip(documents, distances):
+                if threshold > 0:
+                    if dist < threshold:
+                        matches.append(doc)
+                else:
+                    matches.append(doc)
+                    
+            return matches
+
+        except Exception as e:
+            logger.error(f"Failed to find similar: {e}")
+            return []
         """
         Semantically searches the collection for the query.
         Returns joined chunk texts.
         """
+        import time
+        start_ts = time.perf_counter()
+        
         client = get_chroma_client()
         try:
             collection = client.get_collection(name=collection_name)
         except Exception:
-            # Collection might not exist
+            logger.warning(f"Collection '{collection_name}' not found during retrieval.")
             return ""
             
         model = get_embed_model()
         query_vec = model.encode([query]).tolist()
         
-        results = collection.query(
-            query_embeddings=query_vec,
-            n_results=n_results
-        )
-        
-        # results['documents'] is a list of list of strings
-        docs = results.get("documents", [])
-        if not docs or not docs[0]:
-            return ""
+        try:
+            results = collection.query(
+                query_embeddings=query_vec,
+                n_results=n_results
+            )
             
-        return "\n\n".join(docs[0])
+            # results['documents'] is a list of list of strings
+            docs = results.get("documents", [])
+            found_docs = docs[0] if docs and docs[0] else []
+            
+            duration = (time.perf_counter() - start_ts) * 1000
+            if found_docs:
+                logger.info(f"RAG Retrieval '{collection_name}' | Query: {query[:50]}... | Found: {len(found_docs)} docs | Time: {duration:.2f}ms")
+            else:
+                logger.info(f"RAG Retrieval '{collection_name}' | Query: {query[:50]}... | Found: 0 docs | Time: {duration:.2f}ms")
+
+            if not found_docs:
+                return ""
+                
+            return "\n\n".join(found_docs)
+
+        except Exception as e:
+            logger.error(f"RAG Retrieval Failed: {e}")
+            return ""
 
     def get_random_context(self, collection_name: str, n_results: int = 1) -> str:
         """
@@ -158,6 +262,105 @@ class RAGService:
             return ""
             
         return "\n\n".join(docs[0])
+
+        return "\n\n".join(docs[0])
+
+    def index_csv_intents(self, csv_path: str, collection_name: str = "intents") -> int:
+        """
+        Indexes a CSV file (text, intent) for semantic classification.
+        """
+        import csv
+        
+        if not os.path.exists(csv_path):
+            logger.error(f"CSV not found: {csv_path}")
+            return 0
+            
+        texts = []
+        metadatas = []
+        ids = []
+        
+        try:
+            with open(csv_path, 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                count = 0
+                for row in reader:
+                    text = row.get("text", "").strip()
+                    intent = row.get("intent", "").strip()
+                    if text and intent:
+                        texts.append(text)
+                        metadatas.append({"intent": intent, "original_text": text})
+                        ids.append(f"intent_{count}")
+                        count += 1
+                        
+            if not texts:
+                return 0
+                
+            # Get embeddings
+            model = get_embed_model()
+            embeddings = model.encode(texts)
+            
+            # Get/Create collection
+            client = get_chroma_client()
+            # Reset collection mostly to avoid duplicates if re-indexing
+            try:
+                client.delete_collection(collection_name)
+            except Exception:
+                pass
+                
+            collection = client.create_collection(name=collection_name)
+            
+            # Batch add (Chroma handles batching usually, but let's dump all if < 5000)
+            collection.add(
+                documents=texts,
+                embeddings=embeddings.tolist(),
+                metadatas=metadatas,
+                ids=ids
+            )
+            logger.info(f"Indexed {len(texts)} intents into '{collection_name}'")
+            return len(texts)
+            
+        except Exception as e:
+            logger.error(f"Failed to index CSV intents: {e}")
+            return 0
+
+    def predict_intent(self, query: str, collection_name: str = "intents", threshold: float = 0.4) -> Optional[str]:
+        """
+        Predicts intent based on nearest neighbor search.
+        Returns intent string if similarity score is below distance threshold (for cosine distance).
+        Chroma uses L2 by default or Cosine? Default is L2 usually.
+        If using E5-large, we should check distance.
+        """
+        client = get_chroma_client()
+        try:
+            collection = client.get_collection(name=collection_name)
+        except Exception:
+            return None
+            
+        model = get_embed_model()
+        query_vec = model.encode([query]).tolist()
+        
+        results = collection.query(
+            query_embeddings=query_vec,
+            n_results=1
+        )
+        
+        if not results['metadatas'] or not results['metadatas'][0]:
+            return None
+            
+        # Check distance if available
+        # Chroma default for new collections is commonly L2.
+        # But for semantic similarity, we usually want low distance.
+        # Let's use the provided threshold.
+        
+        top_dist = results['distances'][0][0]
+        top_intent = results['metadatas'][0][0].get("intent")
+        
+        if top_dist > threshold:
+            logger.info(f"Intent Prediction REJECTED: Query='{query}' -> Intent='{top_intent}' (Dist: {top_dist:.4f} > {threshold})")
+            return None
+        
+        logger.info(f"Intent Prediction ACCEPTED: Query='{query}' -> Intent='{top_intent}' (Dist: {top_dist:.4f})")
+        return top_intent
 
 rag_service = RAGService()
 

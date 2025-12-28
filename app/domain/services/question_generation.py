@@ -190,8 +190,9 @@ def _call_text_llm(model_name: str, prompt: str) -> Tuple[str, Dict[str, Any]]:
     if model_name == LLMModel.GEMINI_FLASH.value:
         return _gemini_generate(prompt, model=model_name)
 
-    # 4) Şimdilik diğerleri desteklenmiyor
-    raise RuntimeError(f"Unsupported model in question_generation: {model_name}")
+    # 4) Fallback: Assume it is an Ollama model (e.g. "qwen2.5:32b", "mistral", etc.)
+    # This allows any new model pulled via `ollama pull` to work immediately.
+    return _ollama_generate(prompt, model=model_name)
 
 
 # --- Yardımcılar ------------------------------------------------------

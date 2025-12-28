@@ -6,6 +6,13 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 import {
   getChatModes,
@@ -40,6 +47,7 @@ export function ChatScreen({
   const [selectedMode, setSelectedMode] = useState("tutor")
   const [topic, setTopic] = useState(defaultTopic)
   const [level, setLevel] = useState(defaultLevel)
+  const [language, setLanguage] = useState("tr")
   const [useRag, setUseRag] = useState(false) // 🆕 RAG State
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -58,8 +66,13 @@ export function ChatScreen({
           setModes(data)
 
           if (!data[selectedMode]) {
-            const first = Object.keys(data)[0]
-            if (first) setSelectedMode(first)
+            // Prioritize 'tutor' -> 'playground' -> first available
+            if (data["tutor"]) setSelectedMode("tutor")
+            else if (data["playground"]) setSelectedMode("playground")
+            else {
+              const first = Object.keys(data)[0]
+              if (first) setSelectedMode(first)
+            }
           }
         } catch (err) {
           console.error(err)
@@ -99,6 +112,7 @@ export function ChatScreen({
         level,
         message: userMsg.content,
         history: messages,
+        language, // 🆕 Language
         use_rag: useRag, // 🆕 Pass RAG flag
       }
 
@@ -153,33 +167,22 @@ export function ChatScreen({
             </Button>
           )}
 
+          {/* 
           <div>
             <p className="text-xs font-semibold mb-1">Chat Modu</p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(modes).map(([key, m]) => (
                 <button
                   key={key}
-                  onClick={() => {
-                    setSelectedMode(key)
-
-                    // ✅ Review modunda history korunur
-                    if (key !== "review") {
-                      setMessages([])
-                    }
-
-                    setSuggestions([])
-                    setError(null)
-                  }}
-                  className={`px-2 py-1 rounded border text-xs ${selectedMode === key
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted hover:bg-muted/70"
-                    }`}
+                  disabled
+                  className={`px-2 py-1 rounded border text-xs bg-muted opacity-50 cursor-not-allowed`}
                 >
                   {m.title}
                 </button>
               ))}
             </div>
-          </div>
+          </div> 
+          */}
 
           <div>
             <p className="text-xs font-semibold mb-1">Konu</p>
@@ -204,6 +207,22 @@ export function ChatScreen({
               {modes[selectedMode].description}
             </p>
           )}
+
+          <div className="pt-2 border-t border-border">
+            <p className="text-xs font-semibold mb-1">Dil / Language</p>
+            <Select value={language} onValueChange={setLanguage}>
+              <SelectTrigger className="w-full h-8 text-xs">
+                <SelectValue placeholder="Dil Seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tr">🇹🇷 Türkçe</SelectItem>
+                <SelectItem value="en">🇬🇧 English</SelectItem>
+                <SelectItem value="de">🇩🇪 Deutsch</SelectItem>
+                <SelectItem value="es">🇪🇸 Español</SelectItem>
+                <SelectItem value="fr">🇫🇷 Français</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="pt-2 border-t border-border">
             <div className="flex items-center space-x-2">

@@ -14,6 +14,7 @@ import {
   Clock,
   ListChecks,
 } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 import type { UserStats, QuizAttemptHistory } from "@/lib/api"
 import { getRecentAttempts } from "@/lib/api"
 import { UserAnalyticsDashboard } from "@/components/user-analytics-dashboard"
@@ -25,6 +26,7 @@ interface StatsScreenProps {
 }
 
 export function StatsScreen({ stats, token, onBack }: StatsScreenProps) {
+  const { toast } = useToast()
   const accuracyPercentage =
     stats.total_questions > 0
       ? Math.round((stats.correct_answers / stats.total_questions) * 100)
@@ -91,6 +93,36 @@ export function StatsScreen({ stats, token, onBack }: StatsScreenProps) {
     }
   }, [token])
 
+  const handleDownloadPDF = async () => {
+    // API backend endpoint needs user ID.
+    // We added 'id' to UserStats in backend response and frontend interface.
+    if (!token || !stats.id) return
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/reports/student/${stats.id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error("PDF oluşturulamadı")
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `report_${stats.id}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast({
+        title: "Başarılı",
+        description: "Karne PDF olarak indirildi.",
+      })
+    } catch (e) {
+      toast({ title: "Hata", description: "PDF indirilirken hata oluştu.", variant: "destructive" })
+    }
+  }
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
@@ -98,9 +130,14 @@ export function StatsScreen({ stats, token, onBack }: StatsScreenProps) {
           <h2 className="text-3xl font-bold text-foreground">İstatistiklerim</h2>
           <p className="text-muted-foreground">Öğrenme yolculuğunuzu takip edin</p>
         </div>
-        <Button onClick={onBack} variant="outline">
-          Geri Dön
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleDownloadPDF} variant="outline">
+            📥 Karne İndir
+          </Button>
+          <Button onClick={onBack} variant="outline">
+            Geri Dön
+          </Button>
+        </div>
       </div>
 
       {/* Genel istatistik kartları */}

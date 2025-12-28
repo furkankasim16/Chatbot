@@ -20,6 +20,10 @@ interface QuizInterfaceProps {
     questionId: string | number,
     answer: string | string[],
   ) => void | Promise<void>
+  onSkip: () => void
+  onFinish: () => void
+  onHint?: () => void
+  onGiveUp?: () => void
   questionTime?: number
   formatTime?: (ms: number) => string
   selected?: number | null
@@ -42,6 +46,10 @@ export function QuizInterface({
   },
   selected,
   setSelected,
+  onSkip,
+  onFinish,
+  onHint,
+  onGiveUp,
 }: QuizInterfaceProps) {
   const raw = question as any
 
@@ -442,6 +450,16 @@ export function QuizInterface({
             "Cevabı Gönder"
           )}
         </Button>
+
+        <div className="flex flex-col gap-2 pt-2">
+          {/* Main Action Buttons */}
+          {/* Action Buttons Removed as per request */}
+
+          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+            <button onClick={onSkip} className="hover:underline">Soruyu Boş Bırak</button>
+            <button onClick={onFinish} className="hover:underline text-destructive">Quizi Bitir</button>
+          </div>
+        </div>
       </Card>
     </div>
   )

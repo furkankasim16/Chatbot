@@ -80,3 +80,14 @@ export interface Question {
   meta?: Record<string, any>
   source_context?: string
 }
+
+// ✅ Moved from page.tsx to prevent circular deps
+export type QuizMode = "quick" | "daily" | "scenario"
+export type Difficulty = "beginner" | "intermediate" | "advanced" | "mixed"
+
+export interface QuizConfig {
+  mode: QuizMode
+  topic: string
+  difficulty: Difficulty
+  useOllama?: boolean
+}

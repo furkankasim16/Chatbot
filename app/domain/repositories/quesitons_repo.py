@@ -193,15 +193,30 @@ def add_question(q: QuestionModel) -> int:
 
 
         if c.lastrowid:
-            return c.lastrowid
+            new_id = c.lastrowid
+            
+            # [RAG] Index the new question for similarity checks (Fail-Safe)
+            try:
+                from app.domain.services.rag_service import RAGService
+                rag = RAGService()
+                rag.index_text(
+                    text=q.stem, 
+                    collection_name="questions", 
+                    metadata={"question_id": new_id, "topic": q.topic, "difficulty": difficulty_value}
+                )
+            except Exception as e:
+                # Do not block main flow if RAG fails
+                print(f"[RAG] Indexing failed for Q:{new_id} -> {e}")
+                
+            return new_id
 
         # Aynı hash varsa mevcut id'yi bul
         c.execute("SELECT id FROM questions WHERE hash = ?", (q_hash,))
         row = c.fetchone()
-        if not row:
-            raise RuntimeError("Question insert failed and existing row not found")
-
-        return row[0]
+        if row:
+            return row[0]
+            
+        raise Exception("Question could not be added (Hash collision check failed).")
 
 
 def _row_dict(row) -> dict:
@@ -764,3 +779,15 @@ def update_question_in_db(
         return None
 
     return _row_to_question_model(row)
+
+
+def get_all_topics() -> List[str]:
+    """
+    Returns a list of all unique topics in the database, ordered alphabetically.
+    """
+    with questions_cursor() as c:
+        c.execute("SELECT DISTINCT topic FROM questions WHERE topic IS NOT NULL ORDER BY topic ASC")
+        rows = c.fetchall()
+        
+    return [r[0] for r in rows if r[0]]
+
