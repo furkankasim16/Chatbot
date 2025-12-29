@@ -8,6 +8,9 @@ from app.domain.schemas.chat import (
     ChatMessageRole,
     ChatMode,
 )
+from app.domain.services.audit_service import log_action
+
+# [YENİ] Mode Configs
 from app.domain.services.chat_modes import get_mode_config
 from app.domain.services.chat_system_prompts import (
     get_system_prompt,
@@ -37,9 +40,11 @@ logger = logging.getLogger("app.chat")
 # moved to llm_service.py
 
 
-async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
+async def handle_fast_turn(req: ChatTurnRequest, user_id: int | None = None) -> ChatTurnResponse | None:
     """
-    Handles requests that don't need LLM (e.g., direct quiz intents).
+    Hızlı cevap verilebilecek durumları kontrol eder (LLM bypass).
+    Eğer regex/rule match olursa ChatTurnResponse döner.
+    Olmazsa None döner (Heavy path'e devam edilir).
     """
     # A.0) Exact Topic Match
     clean_msg = req.message.strip().lower()
@@ -50,7 +55,8 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
     matched_topic = next((t for t in all_topics if t.lower() == clean_msg), None)
     
     if matched_topic:
-        return ChatTurnResponse(
+        _log_fast("local:topic-match")
+        response = ChatTurnResponse(
            mode=req.mode, topic=matched_topic, level=req.level,
            reply=f"{matched_topic} konusu için quizini başlatıyorum! 🚀",
            suggestions=["Zor olsun", "Topic değiştir"],
@@ -64,13 +70,44 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
            raw_model="local:topic-match",
            session_id=req.session_id,
        )
+        try:
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_USER",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": req.message}
+            )
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_BOT",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+            )
+        except Exception:
+            pass
+        return response
 
+    # [LOGGING] Helper for fast turn logs
+    def _log_fast(model_tag: str, latency: int = 5):
+        try:
+            from app.domain.repositories.llm_run_repo import add_llm_run
+            add_llm_run(
+                model_name=model_tag,
+                prompt_hash=None, 
+                latency_ms=latency, 
+                token_input=0, 
+                token_output=0, 
+                is_success=True
+            )
+        except: pass
+        
     # A) Quiz Intent
     # [FIX] If user says "bu konu" (this topic), skip fast path and let LLM handle it with context.
     is_contextual = "bu konu" in req.message.lower() or "şu konu" in req.message.lower()
     n_intent = None if is_contextual else parse_quiz_intent(req.message)
     
     if n_intent:
+        _log_fast("local:intent-parser")
         quiz_topic = req.topic or "security_policy"
         quiz_level = req.level or "beginner"
 
@@ -88,7 +125,7 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
             "Başlatmak ister misin?"
         )
 
-        return ChatTurnResponse(
+        response = ChatTurnResponse(
             mode=req.mode,
             topic=req.topic,
             level=req.level,
@@ -97,12 +134,29 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
             raw_model="local:intent-parser",
             session_id=req.session_id,
         )
+        try:
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_USER",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": req.message}
+            )
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_BOT",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+            )
+        except Exception:
+            pass
+        return response
 
     # A.5) Greeting / Basic Intent
     from app.domain.services.chat_intents import parse_greeting_intent
     greeting_intent = parse_greeting_intent(req.message)
     if greeting_intent == "greeting":
-         return ChatTurnResponse(
+         _log_fast("local:greeting")
+         response = ChatTurnResponse(
             mode=req.mode,
             topic=req.topic,
             level=req.level,
@@ -111,10 +165,54 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
             raw_model="local:intent-parser-greeting",
             session_id=req.session_id,
         )
+         try:
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_USER",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": req.message}
+            )
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_BOT",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+            )
+         except Exception:
+            pass
+         return response
+
+    # A.5.2) Farewell / Görüşürüz
+    farewell_keywords = ["bay bay", "bye", "hoşçakal", "görüşürüz", "iyi geceler", "iyi günler", "bb"]
+    if any(w in req.message.lower() for w in farewell_keywords):
+         _log_fast("local:farewell")
+         response = ChatTurnResponse(
+            mode=req.mode, topic=req.topic, level=req.level,
+            reply="Görüşmek üzere! İyi çalışmalar dilerim. 👋",
+            suggestions=[],
+            raw_model="local:rule-farewell", session_id=req.session_id
+        )
+         try:
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_USER",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": req.message}
+            )
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_BOT",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+            )
+         except Exception:
+            pass
+         return response
 
     # A.5.1) "Rastgele" / "Random" Shortcut
     if req.message.lower().strip() in ["rastgele", "random", "şansına", "kafana göre"]:
-         return ChatTurnResponse(
+         _log_fast("local:rule-random")
+         response = ChatTurnResponse(
             mode=req.mode, topic=req.topic, level=req.level,
             reply="Tamam! Rastgele bir konuda quiz hazırlıyorum. 🎲",
             suggestions=["Başka konu", "Zor olsun"],
@@ -128,6 +226,22 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
             raw_model="local:rule-rastgele",
             session_id=req.session_id,
         )
+         try:
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_USER",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": req.message}
+            )
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_BOT",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+            )
+         except Exception:
+            pass
+         return response
 
     # [DISABLED due to User Request for Chat-based Quiz Logging]
     # Regex Interceptor was forcing UI mode. We now allow Chat mode quiz but will log it.
@@ -162,7 +276,7 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
         # We rely on strict regex (parse_greeting_intent) for greetings.
         
         if semantic_intent == "farewell":
-             return ChatTurnResponse(
+             response = ChatTurnResponse(
                 mode=req.mode, topic=req.topic, level=req.level,
                 reply="Görüşmek üzere! İyi çalışmalar dilerim. 👋",
                 suggestions=[],
@@ -171,7 +285,7 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
         elif semantic_intent == "quiz_start":
              # Quiz isteğini anladık, standart quiz intentine çevirelim
              # (Opsiyonel: Burada direkt quiz de başlatabiliriz ama kullanıcıya sormak daha nazik)
-             return ChatTurnResponse(
+             response = ChatTurnResponse(
                 mode=req.mode, topic=req.topic, level=req.level,
                 reply="Anladım, kendini test etmek istiyorsun! Hangi konuda quiz yapalım?",
                 suggestions=["Genel Tekrar", "Bu konuda (Mevcut)", "Rastgele"],
@@ -194,7 +308,7 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
                     pass
             
             if extracted_topic:
-                 return ChatTurnResponse(
+                 response = ChatTurnResponse(
                     mode=req.mode, topic=extracted_topic, level=req.level,
                     reply=f"Süper! {extracted_topic} konusundaki quizi başlatıyorum. 🚀",
                     suggestions=["Zor olsun", "İptal"],
@@ -208,19 +322,40 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
                     raw_model="rag:classifier-confirmation-quiz", session_id=req.session_id
                 )
 
-            return ChatTurnResponse(
-                mode=req.mode, topic=req.topic, level=req.level,
-                reply="Harika! Nereden başlayalım? 🚀",
-                suggestions=["Quiz başlat", "Konu anlat", "Rastgele"],
-                raw_model="rag:classifier-confirmation", session_id=req.session_id
-            )
+            else:
+                response = ChatTurnResponse(
+                    mode=req.mode, topic=req.topic, level=req.level,
+                    reply="Harika! Nereden başlayalım? 🚀",
+                    suggestions=["Quiz başlat", "Konu anlat", "Rastgele"],
+                    raw_model="rag:classifier-confirmation", session_id=req.session_id
+                )
         elif semantic_intent == "rejection":
-            return ChatTurnResponse(
+            response = ChatTurnResponse(
                 mode=req.mode, topic=req.topic, level=req.level,
                 reply="Tamamdır, nasıl istersen. Başka bir konuda yardımcı olabilir miyim? 🤔",
                 suggestions=["Neler yapabilirsin?", "Konu değiştir"],
                 raw_model="rag:classifier-rejection", session_id=req.session_id
             )
+        else:
+            response = None # No specific semantic intent matched for fast turn
+
+        if response:
+            try:
+                log_action(
+                    user_id=user_id,
+                    action="CHAT_TURN_USER",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": req.message}
+                )
+                log_action(
+                    user_id=user_id,
+                    action="CHAT_TURN_BOT",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+                )
+            except Exception:
+                pass
+            return response
 
     # [CRITICAL FIX] Intercept Standard Suggestions to Start Quiz Forcefully
     # Prevents LLM from "chatting" about the quiz instead of starting it.
@@ -229,7 +364,7 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
         target_topic = req.topic if "mevcut" in msg_lower or "bu konuda" in msg_lower else "random"
         if "genel" in msg_lower: target_topic = "general"
         
-        return ChatTurnResponse(
+        response = ChatTurnResponse(
             mode=req.mode, topic=target_topic, level=req.level,
             reply=f"{target_topic} konusunda quiz başlatılıyor... 🚀",
             suggestions=[],
@@ -242,13 +377,29 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
             }],
             raw_model="local:suggestion-interceptor", session_id=req.session_id
         )
+        try:
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_USER",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": req.message}
+            )
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_BOT",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+            )
+        except Exception:
+            pass
+        return response
 
     # B) Review Mode Actions
     if req.mode == ChatMode.REVIEW:
         action_type, action_input = parse_action(req.message)
 
         if action_type == "new_question":
-            return ChatTurnResponse(
+            response = ChatTurnResponse(
                 mode=req.mode,
                 topic=req.topic,
                 level=req.level,
@@ -264,13 +415,29 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
                 raw_model="local:review-new_question-bypass",
                 session_id=req.session_id,
             )
+            try:
+                log_action(
+                    user_id=user_id,
+                    action="CHAT_TURN_USER",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": req.message}
+                )
+                log_action(
+                    user_id=user_id,
+                    action="CHAT_TURN_BOT",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+                )
+            except Exception:
+                pass
+            return response
 
         if action_type == "quiz_from_gaps":
             data = try_parse_json(action_input) or {}
             n = max(1, min(20, int(data.get("n", 5) or 5)))
             gaps = data.get("gaps") if isinstance(data.get("gaps"), list) else []
             
-            return ChatTurnResponse(
+            response = ChatTurnResponse(
                 mode=req.mode,
                 topic=req.topic,
                 level=req.level,
@@ -286,12 +453,28 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
                 raw_model="local:review-quiz_from_gaps-bypass",
                 session_id=req.session_id,
             )
+            try:
+                log_action(
+                    user_id=req.user_id,
+                    action="CHAT_TURN_USER",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": req.message}
+                )
+                log_action(
+                    user_id=req.user_id,
+                    action="CHAT_TURN_BOT",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+                )
+            except Exception:
+                pass
+            return response
 
         if action_type == "quiz_topic":
             data = try_parse_json(action_input) or {}
             n = max(1, min(20, int(data.get("n", 5) or 5)))
             
-            return ChatTurnResponse(
+            response = ChatTurnResponse(
                 mode=req.mode,
                 topic=req.topic,
                 level=req.level,
@@ -307,6 +490,22 @@ async def handle_fast_turn(req: ChatTurnRequest) -> ChatTurnResponse | None:
                 raw_model="local:review-quiz_topic-bypass",
                 session_id=req.session_id,
             )
+            try:
+                log_action(
+                    user_id=req.user_id,
+                    action="CHAT_TURN_USER",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": req.message}
+                )
+                log_action(
+                    user_id=req.user_id,
+                    action="CHAT_TURN_BOT",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+                )
+            except Exception:
+                pass
+            return response
 
     return None
 
@@ -317,13 +516,21 @@ async def handle_heavy_turn(req: ChatTurnRequest, user_id: int | None = None) ->
     """
     action_type, action_input = parse_action(req.message)
     mode_cfg = get_mode_config(req.mode)
+
+    # [OVERRIDE] If user selected a specific model, override the default config
+    if req.model:
+        from dataclasses import replace
+        # Validate if model is supported? We can check against LLMModel enum or just trust it (llm_service validates too)
+        logger.info(f"Overriding model for mode {req.mode}: {mode_cfg.model} -> {req.model}")
+        mode_cfg = replace(mode_cfg, model=req.model)
+
     
     # [OPTIMIZATION] Fast-track simple "Start Quiz" commands in Tutor Mode
     # This prevents waiting 20s for LLM just to say "Okay"
     if req.mode == ChatMode.TUTOR:
          clean_msg = req.message.strip().lower()
          if clean_msg in {"evet başlat", "başlat", "start", "quiz başlat", "evet"}:
-             return ChatTurnResponse(
+             response = ChatTurnResponse(
                 mode=req.mode, topic=req.topic, level=req.level,
                 reply="Harika! Quiz başlıyor... 🚀",
                 suggestions=[],
@@ -337,259 +544,313 @@ async def handle_heavy_turn(req: ChatTurnRequest, user_id: int | None = None) ->
                 raw_model="local:fast-start",
                 session_id=req.session_id,
             )
-    logger.info(f"Generating system prompt for mode={req.mode} language={req.language or 'tr'} user_id={user_id}")
-    system_prompt = get_system_prompt(
-        mode=req.mode,
-        topic=req.topic,
-        level=req.level,
-        language=req.language or "tr",
-    )
+             try:
+                log_action(
+                    user_id=user_id,
+                    action="CHAT_TURN_USER",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": req.message}
+                )
+                log_action(
+                    user_id=user_id,
+                    action="CHAT_TURN_BOT",
+                    entity_type="chat_message",
+                    details={"mode": req.mode.value, "message": response.reply, "raw_model": response.raw_model}
+                )
+             except Exception:
+                pass
+             return response
 
-    # 2. Add RAG Context (if eligible)
-    if req.use_rag and (req.mode != ChatMode.REVIEW or (req.mode == ChatMode.REVIEW and not action_type)):
-        from app.domain.services.rag_service import rag_service
-        kb_context = rag_service.retrieve_context(req.message, collection_name="knowledge-base", n_results=2)
-        if kb_context:
-            system_prompt += f"\n\nBİLGİ BANKASI (Bağlam):\n{kb_context}\n\n⚠️ KESİN TALİMAT: Yukarıdaki 'BİLGİ BANKASI' içeriği İngilizce olabilir. Sen bunu kullanırken MUTLAKA ve SADECE TÜRKÇE'ye çevirerek anlatmalısın. Metni olduğu gibi kopyalama, çevirerek özetle."
-
-    # 3. Add Review-specific format instructions
-    if req.mode == ChatMode.REVIEW and action_type:
-        if action_type == "improve":
-            system_prompt += '\n\nÇIKTI FORMATI: Şema: {"answer": "2-8 cümle..."}. SADECE JSON.'
-        elif action_type == "ask_gaps":
-            system_prompt += '\n\nÇIKTI FORMATI: Şema: {"questions": ["..."]}. SADECE JSON.'
-
-    # 4. Construct Messages
-    messages = [ChatMessage(role=ChatMessageRole.SYSTEM, content=system_prompt)]
-    if req.history:
-        messages.extend(req.history[-mode_cfg.max_history :])
-
-    # 5. Determine User Content (Logic for Review 'Answer Only' format)
-    user_content = action_input if (req.mode == ChatMode.REVIEW and action_type) else req.message
-    if req.mode == ChatMode.REVIEW and not action_type and is_answer_only(user_content):
-        last_q = find_last_question_from_history(req.history)
-        if last_q:
-            user_content = f"SORU: {last_q}\nCEVAP: {user_content}"
-        else:
-            user_content = f"SORU: (bulunamadı)\nCEVAP: {user_content}\n(Soru bulunamadı, lütfen SORU: ... CEVAP: ... formatında yaz)"
-
-    messages.append(ChatMessage(role=ChatMessageRole.USER, content=user_content + "\n\n(ÖNEMLİ: Cevabın teknik terimler dahil TAMAMEN TÜRKÇE olmalı. İngilizce açıklama istemiyorum. Context İngilizce ise sen onu Türkçeye çevir.)"))
-    
-    logger.info(f"Chat Turn [User: {user_id}] [Mode: {req.mode}] Input: {user_content[:100]}...")
-
-    # 6. Determine Retry Prompt Strategy
-    retry_prompt = None
-    if req.mode == ChatMode.REVIEW and action_type in (None, "improve", "ask_gaps"):
-        retry_prompt = get_retry_system_prompt(action_type)
-
-    # 7. Execute LLM Logic
-    result = await execute_chat_completion_with_retry(mode_cfg, messages, retry_prompt)
-    
-    reply_text = result["content"]
-    logger.info(f"Chat Turn [User: {user_id}] Reply: {reply_text[:100]}...")
-
-    usage = {
-        **result["usage"],
-        "provider": mode_cfg.provider,
-        "model": mode_cfg.model,
-        "mode": str(req.mode),
-    }
-
-    # 8. Post-Process Response (Actions/Suggestions)
-    actions = None
-    suggestions = None
-
-    if req.mode == ChatMode.REVIEW:
-        if action_type == "improve":
-            data = try_parse_json(reply_text) or {}
-            answer = (data.get("answer") or "").strip() or reply_text
-            actions = [{"type": "improved_answer", "payload": {"answer": answer}}]
-            reply_text = "Tamam. Cevabını daha iyi hale getirdim."
-            suggestions = ["Input’a uygula", "Tekrar değerlendir"]
-        elif action_type == "ask_gaps":
-            data = try_parse_json(reply_text) or {}
-            questions = list_of_str(data.get("questions"))
-            actions = [{"type": "clarifying_questions", "payload": {"questions": questions[:7]}}]
-            reply_text = "Eksiklerini netleştirmek için birkaç soru çıkardım."
-            suggestions = ["Seçilenleri input’a ekle", "Tekrar değerlendir"]
-        else:
-            # Assessment Result
-            data = try_parse_json(reply_text)
-            if data:
-                payload = normalize_review_payload(data)
-                score = payload["score"]
-                label = "Geçer" if score >= 6 else "Geliştirilmeli"
-                hint = payload["gaps"][0] if payload["gaps"] else ""
-                reply_text = f"{label}. Puanın {score}/10. {hint}".strip()
-                actions = [{"type": "review_result", "payload": payload}]
-                suggestions = ["Cevabımı geliştir", "Eksiklerimi sor", "Bu konudan yeni soru sor"]
-            else:
-                reply_text = "JSON formatı geçerli değil. Lütfen tekrar dene."
-                suggestions = ["Sadece cevabını yaz"]
-
-    elif req.mode == ChatMode.TUTOR:
-        suggestions = ["Örnek soru ver", "Detaylandır", "Özetle", "5 soru"]
-       # ------------------------------------------------------------------
-    # 5) LLM Generation
-    # ------------------------------------------------------------------
-    full_response = ""
     try:
-        # Use configuration from mode
-        mode_cfg = get_mode_config(req.mode)
-        
-        # Prepare messages
-        messages_payload = [
-            ChatMessage(role=ChatMessageRole.SYSTEM, content=system_prompt),
-            ChatMessage(role=ChatMessageRole.USER, content=user_content)
-        ]
-        
-
-
-        full_response_dict = await execute_chat_completion_with_retry(
-            cfg=mode_cfg,
-            messages=messages_payload,
+        logger.info(f"Generating system prompt for mode={req.mode} language={req.language or 'tr'} user_id={user_id}")
+        system_prompt = get_system_prompt(
+            mode=req.mode,
+            topic=req.topic,
+            level=req.level,
+            language=req.language or "tr",
         )
-        full_response = full_response_dict.get("content", "")
 
-        # [CHAT QUIZ LOGGING] Parse tags and log to DB
+        # 2. Add RAG Context (if eligible)
+        if req.use_rag and (req.mode != ChatMode.REVIEW or (req.mode == ChatMode.REVIEW and not action_type)):
+            from app.domain.services.rag_service import rag_service
+            kb_context = rag_service.retrieve_context(req.message, collection_name="knowledge-base", n_results=2)
+            if kb_context:
+                system_prompt += f"\n\nBİLGİ BANKASI (Bağlam):\n{kb_context}\n\n⚠️ KESİN TALİMAT: Yukarıdaki 'BİLGİ BANKASI' içeriği İngilizce olabilir. Sen bunu kullanırken MUTLAKA ve SADECE TÜRKÇE'ye çevirerek anlatmalısın. Metni olduğu gibi kopyalama, çevirerek özetle."
+
+        # 3. Add Review-specific format instructions
+        if req.mode == ChatMode.REVIEW and action_type:
+            if action_type == "improve":
+                system_prompt += '\n\nÇIKTI FORMATI: Şema: {"answer": "2-8 cümle..."}. SADECE JSON.'
+            elif action_type == "ask_gaps":
+                system_prompt += '\n\nÇIKTI FORMATI: Şema: {"questions": ["..."]}. SADECE JSON.'
+
+        # 4. Construct Messages
+        messages = [ChatMessage(role=ChatMessageRole.SYSTEM, content=system_prompt)]
+        if req.history:
+            messages.extend(req.history[-mode_cfg.max_history :])
+
+        # 5. Determine User Content (Logic for Review 'Answer Only' format)
+        user_content = action_input if (req.mode == ChatMode.REVIEW and action_type) else req.message
+        if req.mode == ChatMode.REVIEW and not action_type and is_answer_only(user_content):
+            last_q = find_last_question_from_history(req.history)
+            if last_q:
+                user_content = f"SORU: {last_q}\nCEVAP: {user_content}"
+            else:
+                user_content = f"SORU: (bulunamadı)\nCEVAP: {user_content}\n(Soru bulunamadı, lütfen SORU: ... CEVAP: ... formatında yaz)"
+
+        messages.append(ChatMessage(role=ChatMessageRole.USER, content=user_content + "\n\n(ÖNEMLİ: Cevabın teknik terimler dahil TAMAMEN TÜRKÇE olmalı. İngilizce açıklama istemiyorum. Context İngilizce ise sen onu Türkçeye çevir.)"))
+        
+        logger.info(f"Chat Turn [User: {user_id}] [Mode: {req.mode}] Input: {user_content[:100]}...")
+
+        # Log user message
         try:
-            await _parse_and_log_chat_quiz(full_response, user_id=1, session_id=req.session_id) 
-        except Exception as e:
-            print(f"Chat Quiz Log Error: {e}")
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_USER",
+                entity_type="chat_message",
+                details={"mode": req.mode.value, "message": req.message}
+            )
+        except Exception:
+            pass
 
-        # [CLEANUP] Remove XML tags from the user-facing response
-        import re
-        # Remove <QUIZ_Q ...>Content</QUIZ_Q> but KEEP Content? 
-        # Actually the screenshot shows the Question text IS inside the tag.
-        # So we want to keep the content but remove the tags?
-        # The user sees: QUIZ_Q topic=... > What is ... < /QUIZ_Q >
-        # We should probably format it nicely or just strip the tags and keep the text.
-        # Let's replace the tags with nothing but keep content? 
-        # Regex to remove <QUIZ_Q...> and </QUIZ_Q> wrapper but keep inner text.
-        # And remove <QUIZ_EVAL...>...</QUIZ_EVAL> entirely? EVAL is internal feedback usually?
-        # If EVAL contains "Correct/Wrong", we want to show it but maybe formatted.
-        
-        # Strategy:
-        # 1. Strip <QUIZ_Q ...> and replace with "Soru: "
-        # 2. Strip </QUIZ_Q>
-        # 3. Strip <QUIZ_EVAL ...> and </QUIZ_EVAL> (maybe keep content if it's text feedback)
-        
-        # Cleanup Tags (Generic & Robust)
-        # Replacing <QUIZ_Q ...>...</QUIZ_Q> -> **SORU:** ...
-        full_response = re.sub(r'<QUIZ_Q[^>]*>', '**SORU:** ', full_response, flags=re.IGNORECASE)
-        full_response = re.sub(r'</QUIZ_Q>', '\n', full_response, flags=re.IGNORECASE)
-        
-        # Replacing <QUIZ_EVAL ...>...</QUIZ_EVAL> -> **DEĞERLENDİRME:** ...
-        full_response = re.sub(r'<QUIZ_EVAL[^>]*>', '**DEĞERLENDİRME:** ', full_response, flags=re.IGNORECASE)
-        full_response = re.sub(r'</QUIZ_EVAL>', '\n', full_response, flags=re.IGNORECASE)
+        # 6. Determine Retry Prompt Strategy
+        retry_prompt = None
+        if req.mode == ChatMode.REVIEW and action_type in (None, "improve", "ask_gaps"):
+            retry_prompt = get_retry_system_prompt(action_type)
 
-        # [STUBBORN MODEL FIXES] Aggressive User-Side Replacements
-        # [STUBBORN MODEL FIXES] Aggressive User-Side Replacements
-        # [STUBBORN MODEL FIXES] Aggressive User-Side Replacements
-        # [STUBBORN MODEL FIXES] Aggressive User-Side Replacements
-        # Handles bold markers (** or __) and varying separators
-        replacements = {
-            r"Quiz Time.*": "Günün Sorusu", 
-            r"(?:\*\*|__)?Iterative\s+Development(?:\*\*|__)?": "Yinelemeli Geliştirme",
-            r"(?:\*\*|__)?Iterative(?:\*\*|__)?": "Yinelemeli",
-            r"(?:\*\*|__)?Incremental\s+Delivery(?:\*\*|__)?": "Artımlı Teslimat",
-            r"(?:\*\*|__)?Incremental\s+Development(?:\*\*|__)?": "Artımlı Geliştirme",
-            r"(?:\*\*|__)?Incremental(?:\*\*|__)?": "Artımlı",
-            r"(?:\*\*|__)?Customer\s+Collaboration(?:\*\*|__)?": "Müşteri İşbirliği",
-            r"(?:\*\*|__)?Collaborative(?:\*\*|__)?": "İşbirlikçi",
-            r"(?:\*\*|__)?Customer[\s\.\-]+Centric(?:\*\*|__)?": "Müşteri Odaklı",
-            r"(?:\*\*|__)?Customer[\s\.\-]+Oriented(?:\*\*|__)?": "Müşteri Odaklı",
-            r"(?:\*\*|__)?Customer\s+Focus(?:\*\*|__)?": "Müşteri Odaklılık",
-            r"(?:\*\*|__)?Responding\s+to\s+Change(?:\*\*|__)?": "Değişime Yanıt Verme",
-            r"(?:\*\*|__)?Working\s+Software(?:\*\*|__)?": "Çalışan Yazılım",
-            r"(?:\*\*|__)?individuals\s+and\s+interactions(?:\*\*|__)?": "Bireyler ve Etkileşimler",
-            r"(?:\*\*|__)?What\s+is(?:\*\*|__)?": "Nedir:",
-            r"(?:\*\*|__)?Core\s+Values(?:\*\*|__)?": "Temel Değerler",
-            r"(?:\*\*|__)?Key\s+Concepts(?:\*\*|__)?": "Temel Kavramlar",
-            r"(?:\*\*|__)?Benefits:?(?:\*\*|__)?": "Avantajlar:",
-            r"(?:\*\*|__)?Roles:?(?:\*\*|__)?": "Roller:",
-            r"(?:\*\*|__)?Flexibility(?:\*\*|__)?": "Esneklik",
-            r"(?:\*\*|__)?Flexible(?:\*\*|__)?": "Esnek",
-            r"(?:\*\*|__)?Prioritization(?:\*\*|__)?": "Önceliklendirme",
-            r"(?:\*\*|__)?Prioritized\s+Requirements(?:\*\*|__)?": "Önceliklendirilmiş Gereksinimler",
-            r"(?:\*\*|__)?Faster\s+Time[\s\.\-]+to[\s\.\-]+Market(?:\*\*|__)?": "Pazara Hızlı Çıkış", 
-            r"(?:\*\*|__)?Rapid\s+Feedback(?:\*\*|__)?": "Hızlı Geri Bildirim",
-            r"(?:\*\*|__)?Improved\s+Collaboration(?:\*\*|__)?": "Gelişmiş İşbirliği",
-            r"(?:\*\*|__)?Increased\s+Customer\s+Satisfaction(?:\*\*|__)?": "Artan Müşteri Memnuniyeti",
-            r"(?:\*\*|__)?Increased\s+Flexibility(?:\*\*|__)?": "Artan Esneklik",
-            r"(?:\*\*|__)?Better\s+Quality(?:\*\*|__)?": "Daha İyi Kalite",
-            r"(?:\*\*|__)?Continuous\s+Improvement(?:\*\*|__)?": "Sürekli İyileştirme",
-            r"(?:\*\*|__)?Agile\s+Methodology's\s+Main\s+Principles(?:\*\*|__)?": "Agile Metodolojisinin Temel İlkeleri",
-            r"(?:\*\*|__)?Agile\s+Methodology's\s+Key\s+Roles(?:\*\*|__)?": "Agile Metodolojisinin Temel Rolleri",
-            r"(?:\*\*|__)?Agile\s+Methodology's\s+Key\s+Artifacts(?:\*\*|__)?": "Agile Metodolojisinin Temel Bileşenleri (Artifacts)",
-            r"(?:\*\*|__)?Product\s+Owner(?:\*\*|__)?": "Ürün Sahibi (Product Owner)",
-            r"(?:\*\*|__)?Scrum\s+Master(?:\*\*|__)?": "Scrum Yöneticisi (Scrum Master)",
-            r"(?:\*\*|__)?Development\s+Team(?:\*\*|__)?": "Geliştirme Takımı",
-            r"(?:\*\*|__)?Product\s+Backlog(?:\*\*|__)?": "Ürün İş Listesi (Product Backlog)",
-            r"(?:\*\*|__)?Sprint\s+Backlog(?:\*\*|__)?": "Sprint İş Listesi",
-            r"(?:\*\*|__)?Burn-Down\s+Chart(?:\*\*|__)?": "Kalan İş Grafiği (Burn-Down Chart)",
-            r"(?:\*\*|__)?Rapid\s+and\s+Flexible\s+Response\s+to\s+Change(?:\*\*|__)?": "Değişime Hızlı ve Esnek Yanıt Verme",
-            r"(?:\*\*|__)?Your\s+Turn!.*": "",
-            r"(?:\*\*|__)?Prioritizing\s+Features(?:\*\*|__)?": "Özelliklerin Önceliklendirilmesi",
-            r"(?:\*\*|__)?Short\s+Iterations(?:\*\*|__)?": "Kısa İterasyonlar",
-            r"(?:\*\*|__)?Daily\s+Stand-up\s+Meetings(?:\*\*|__)?": "Günlük Ayakta Toplantılar",
-            r"(?:\*\*|__)?Early\s+and\s+Often\s+Feedback(?:\*\*|__)?": "Erken ve Sık Geri Bildirim",
-            r"(?:\*\*|__)?Visual\s+Management(?:\*\*|__)?": "Görsel Yönetim",
-            r"(?:\*\*|__)?Sustainable\s+Pace(?:\*\*|__)?": "Sürdürülebilir Hız",
-            r"(?:\*\*|__)?Yinelemeli\s+and\s+Artımlı(?:\*\*|__)?": "Yinelemeli ve Artımlı", # Fix specific grammar
-            r"\s+and\s+": " ve ", # General fix for " and " inside sentences
-            r"(?:\*\*|__)?Self-Organizing\s+Teams(?:\*\*|__)?": "Kendi Kendini Yöneten Takımlar",
-            r"(?:\*\*|__)?Agile\s+Methodologies(?:\*\*|__)?": "Agile Yöntemleri",
-            r"(?:\*\*|__)?Lean\s+Software\s+Development(?:\*\*|__)?": "Yalın Yazılım Geliştirme",
-            r"(?:\*\*|__)?Muhasebecilik(?:\*\*|__)?": "Yalın Yazılım Geliştirme", 
-            r"(?:\*\*|__)?Extreme\s+Programming\s*\(?XP\)?(?:\*\*|__)?": "Ekstrem Programlama (XP)",
-            r"(?:\*\*|__)?ürün_owner(?:\*\*|__)?": "Ürün Sahibi",
-            r"(?:\*\*|__)?Müşteri\s+Merkezi(?:\*\*|__)?": "Müşteri Odaklılık", 
-            r"(?:\*\*|__)?What\s+is\s+the\s+main\s+goal\s+of\s+Agile\s+methodology\??(?:\*\*|__)?": "Agile metodolojisinin temel amacı nedir?",
-            r"(?:\*\*|__)?Please\s+answer\s+in\s+Turkish.*": "",
-            r"(?:\*\*|__)?Please\s+respond\s+with.*": "", 
-            r"(?:\*\*|__)?Please\s+respond\s+in\s+Turkish.*": "",
-            r"(?:\*\*|__)?Remember\s+to\s+keep.*": "",
-            r"(?:\*\*|__)?Correct\s+answer:?": "Doğru Cevap:",
-            r"Ağaçlı": "Agile", 
-            r"Iteratif": "Yinelemeli", 
-            r"Incikti": "Artımlı", 
-            r"Flexibilite": "Esneklik", 
-            r"(?:\*\*|__)?Collaboration(?:\*\*|__)?": "İşbirliği", 
-            r"(?:\*\*|__)?Customer\s+Satisfaction(?:\*\*|__)?": "Müşteri Memnuniyeti", 
-            r"(?:\*\*|__)?Soru:[\s\n]*SORU:(?:\*\*|__)?": "**SORU:**", 
-            r"(?:\*\*|__)?processinin(?:\*\*|__)?": "sürecinin",
-            r"(?:\*\*|__)?deployment(?:\*\*|__)?": "dağıtım", 
-            r"(?:\*\*|__)?deploy\s+etmek(?:\*\*|__)?": "dağıtımını yapmak (deploy)", # Fix Plaza Turkish
-            r"(?:\*\*|__)?Nedir:\s+the\s+main\s+difference\s+between(?:\*\*|__)?": "Arasındaki temel fark nedir:",
-            r"(?:\*\*|__)?What\s+is\s+the\s+main\s+goal\s+of\s+Agile\s+methodology\??(?:\*\*|__)?": "Agile metodolojisinin temel amacı nedir?",
-            r"(?:\*\*|__)?Doğru\s+cevap:\s*['\"]?Monolithic\s+architecture\s+refers.*": "Doğru cevap: Monolitik mimari, uygulamanın tek bir birim olarak geliştirilmesidir.",
-            r"Now\s+it's\s+your\s+turn!.*": "", 
-            r"\(\s*$": "", # Remove trailing open parenthesis
-            r"\*\*QUIZ_EVAL": "**DEĞERLENDİRME:", 
-            r"correct=\"true\">": "", 
+        # 7. Execute LLM Logic
+        result = await execute_chat_completion_with_retry(mode_cfg, messages, retry_prompt)
+        
+        reply_text = result["content"]
+        logger.info(f"Chat Turn [User: {user_id}] Reply: {reply_text[:100]}...")
+
+        usage = {
+            **result["usage"],
+            "provider": mode_cfg.provider,
+            "model": mode_cfg.model,
+            "mode": str(req.mode),
         }
-        
-        # Sort by length descending to prevent partial matches (e.g. replacing 'Iterative' inside 'Iterative Development')
-        sorted_patterns = sorted(replacements.keys(), key=len, reverse=True)
-        
-        original_response_len = len(full_response)
-        for pattern in sorted_patterns:
-            full_response = re.sub(pattern, replacements[pattern], full_response, flags=re.IGNORECASE)
+
+        # 8. Post-Process Response (Actions/Suggestions)
+        actions = None
+        suggestions = None
+        final_reply = reply_text # Will be modified by post-processing
+
+        if req.mode == ChatMode.REVIEW:
+            if action_type == "improve":
+                data = try_parse_json(reply_text) or {}
+                answer = (data.get("answer") or "").strip() or reply_text
+                actions = [{"type": "improved_answer", "payload": {"answer": answer}}]
+                final_reply = "Tamam. Cevabını daha iyi hale getirdim."
+                suggestions = ["Input’a uygula", "Tekrar değerlendir"]
+            elif action_type == "ask_gaps":
+                data = try_parse_json(reply_text) or {}
+                questions = list_of_str(data.get("questions"))
+                actions = [{"type": "clarifying_questions", "payload": {"questions": questions[:7]}}]
+                final_reply = "Eksiklerini netleştirmek için birkaç soru çıkardım."
+                suggestions = ["Seçilenleri input’a ekle", "Tekrar değerlendir"]
+            else:
+                # Assessment Result
+                data = try_parse_json(reply_text)
+                if data:
+                    payload = normalize_review_payload(data)
+                    score = payload["score"]
+                    label = "Geçer" if score >= 6 else "Geliştirilmeli"
+                    hint = payload["gaps"][0] if payload["gaps"] else ""
+                    final_reply = f"{label}. Puanın {score}/10. {hint}".strip()
+                    actions = [{"type": "review_result", "payload": payload}]
+                    suggestions = ["Cevabımı geliştir", "Eksiklerimi sor", "Bu konudan yeni soru sor"]
+                else:
+                    final_reply = "JSON formatı geçerli değil. Lütfen tekrar dene."
+                    suggestions = ["Sadece cevabını yaz"]
+
+        elif req.mode == ChatMode.TUTOR:
+            suggestions = ["Örnek soru ver", "Detaylandır", "Özetle", "5 soru"]
+        # ------------------------------------------------------------------
+        # 5) LLM Generation
+        # ------------------------------------------------------------------
+        full_response = final_reply # Initialize with potentially modified reply_text
+        try:
+            # Use configuration from mode
+            mode_cfg = get_mode_config(req.mode)
             
-        logger.info(f"Chat Response Cleanup: Replaced English terms. Length changed from {original_response_len} to {len(full_response)}")
-    
+            # Prepare messages
+            messages_payload = [
+                ChatMessage(role=ChatMessageRole.SYSTEM, content=system_prompt),
+                ChatMessage(role=ChatMessageRole.USER, content=user_content)
+            ]
+            
+
+
+            full_response_dict = await execute_chat_completion_with_retry(
+                cfg=mode_cfg,
+                messages=messages_payload,
+            )
+            full_response = full_response_dict.get("content", "")
+
+            # [CHAT QUIZ LOGGING] Parse tags and log to DB
+            try:
+                await _parse_and_log_chat_quiz(full_response, user_id=user_id, session_id=req.session_id) 
+            except Exception as e:
+                print(f"Chat Quiz Log Error: {e}")
+
+            # [CLEANUP] Remove XML tags from the user-facing response
+            import re
+            # Remove <QUIZ_Q ...>Content</QUIZ_Q> but KEEP Content? 
+            # Actually the screenshot shows the Question text IS inside the tag.
+            # So we want to keep the content but remove the tags.
+            # The user sees: QUIZ_Q topic=... > What is ... < /QUIZ_Q >
+            # We should probably format it nicely or just strip the tags and keep the text.
+            # Let's replace the tags with nothing but keep content? 
+            # Regex to remove <QUIZ_Q...> and </QUIZ_Q> wrapper but keep inner text.
+            # And remove <QUIZ_EVAL...>...</QUIZ_EVAL> entirely? EVAL is internal feedback usually?
+            # If EVAL contains "Correct/Wrong", we want to show it but maybe formatted.
+            
+            # Strategy:
+            # 1. Strip <QUIZ_Q ...> and replace with "Soru: "
+            # 2. Strip </QUIZ_Q>
+            # 3. Strip <QUIZ_EVAL ...> and </QUIZ_EVAL> (maybe keep content if it's text feedback)
+            
+            # Cleanup Tags (Generic & Robust)
+            # Replacing <QUIZ_Q ...>...</QUIZ_Q> -> **SORU:** ...
+            full_response = re.sub(r'<QUIZ_Q[^>]*>', '**SORU:** ', full_response, flags=re.IGNORECASE)
+            full_response = re.sub(r'</QUIZ_Q>', '\n', full_response, flags=re.IGNORECASE)
+            
+            # Replacing <QUIZ_EVAL ...>...</QUIZ_EVAL> -> **DEĞERLENDİRME:** ...
+            full_response = re.sub(r'<QUIZ_EVAL[^>]*>', '**DEĞERLENDİRME:** ', full_response, flags=re.IGNORECASE)
+            full_response = re.sub(r'</QUIZ_EVAL>', '\n', full_response, flags=re.IGNORECASE)
+
+            # [STUBBORN MODEL FIXES] Aggressive User-Side Replacements
+            # [STUBBORN MODEL FIXES] Aggressive User-Side Replacements
+            # [STUBBORN MODEL FIXES] Aggressive User-Side Replacements
+            # [STUBBORN MODEL FIXES] Aggressive User-Side Replacements
+            # Handles bold markers (** or __) and varying separators
+            replacements = {
+                r"Quiz Time.*": "Günün Sorusu", 
+                r"(?:\*\*|__)?Iterative\s+Development(?:\*\*|__)?": "Yinelemeli Geliştirme",
+                r"(?:\*\*|__)?Iterative(?:\*\*|__)?": "Yinelemeli",
+                r"(?:\*\*|__)?Incremental\s+Delivery(?:\*\*|__)?": "Artımlı Teslimat",
+                r"(?:\*\*|__)?Incremental\s+Development(?:\*\*|__)?": "Artımlı Geliştirme",
+                r"(?:\*\*|__)?Incremental(?:\*\*|__)?": "Artımlı",
+                r"(?:\*\*|__)?Customer\s+Collaboration(?:\*\*|__)?": "Müşteri İşbirliği",
+                r"(?:\*\*|__)?Collaborative(?:\*\*|__)?": "İşbirlikçi",
+                r"(?:\*\*|__)?Customer[\s\.\-]+Centric(?:\*\*|__)?": "Müşteri Odaklı",
+                r"(?:\*\*|__)?Customer[\s\.\-]+Oriented(?:\*\*|__)?": "Müşteri Odaklı",
+                r"(?:\*\*|__)?Customer\s+Focus(?:\*\*|__)?": "Müşteri Odaklılık",
+                r"(?:\*\*|__)?Responding\s+to\s+Change(?:\*\*|__)?": "Değişime Yanıt Verme",
+                r"(?:\*\*|__)?Working\s+Software(?:\*\*|__)?": "Çalışan Yazılım",
+                r"(?:\*\*|__)?individuals\s+and\s+interactions(?:\*\*|__)?": "Bireyler ve Etkileşimler",
+                r"(?:\*\*|__)?What\s+is(?:\*\*|__)?": "Nedir:",
+                r"(?:\*\*|__)?Core\s+Values(?:\*\*|__)?": "Temel Değerler",
+                r"(?:\*\*|__)?Key\s+Concepts(?:\*\*|__)?": "Temel Kavramlar",
+                r"(?:\*\*|__)?Benefits:?(?:\*\*|__)?": "Avantajlar:",
+                r"(?:\*\*|__)?Roles:?(?:\*\*|__)?": "Roller:",
+                r"(?:\*\*|__)?Flexibility(?:\*\*|__)?": "Esneklik",
+                r"(?:\*\*|__)?Flexible(?:\*\*|__)?": "Esnek",
+                r"(?:\*\*|__)?Prioritization(?:\*\*|__)?": "Önceliklendirme",
+                r"(?:\*\*|__)?Prioritized\s+Requirements(?:\*\*|__)?": "Önceliklendirilmiş Gereksinimler",
+                r"(?:\*\*|__)?Faster\s+Time[\s\.\-]+to[\s\.\-]+Market(?:\*\*|__)?": "Pazara Hızlı Çıkış", 
+                r"(?:\*\*|__)?Rapid\s+Feedback(?:\*\*|__)?": "Hızlı Geri Bildirim",
+                r"(?:\*\*|__)?Improved\s+Collaboration(?:\*\*|__)?": "Gelişmiş İşbirliği",
+                r"(?:\*\*|__)?Increased\s+Customer\s+Satisfaction(?:\*\*|__)?": "Artan Müşteri Memnuniyeti",
+                r"(?:\*\*|__)?Increased\s+Flexibility(?:\*\*|__)?": "Artan Esneklik",
+                r"(?:\*\*|__)?Better\s+Quality(?:\*\*|__)?": "Daha İyi Kalite",
+                r"(?:\*\*|__)?Continuous\s+Improvement(?:\*\*|__)?": "Sürekli İyileştirme",
+                r"(?:\*\*|__)?Agile\s+Methodology's\s+Main\s+Principles(?:\*\*|__)?": "Agile Metodolojisinin Temel İlkeleri",
+                r"(?:\*\*|__)?Agile\s+Methodology's\s+Key\s+Roles(?:\*\*|__)?": "Agile Metodolojisinin Temel Rolleri",
+                r"(?:\*\*|__)?Agile\s+Methodology's\s+Key\s+Artifacts(?:\*\*|__)?": "Agile Metodolojisinin Temel Bileşenleri (Artifacts)",
+                r"(?:\*\*|__)?Product\s+Owner(?:\*\*|__)?": "Ürün Sahibi (Product Owner)",
+                r"(?:\*\*|__)?Scrum\s+Master(?:\*\*|__)?": "Scrum Yöneticisi (Scrum Master)",
+                r"(?:\*\*|__)?Development\s+Team(?:\*\*|__)?": "Geliştirme Takımı",
+                r"(?:\*\*|__)?Product\s+Backlog(?:\*\*|__)?": "Ürün İş Listesi (Product Backlog)",
+                r"(?:\*\*|__)?Sprint\s+Backlog(?:\*\*|__)?": "Sprint İş Listesi",
+                r"(?:\*\*|__)?Burn-Down\s+Chart(?:\*\*|__)?": "Kalan İş Grafiği (Burn-Down Chart)",
+                r"(?:\*\*|__)?Rapid\s+and\s+Flexible\s+Response\s+to\s+Change(?:\*\*|__)?": "Değişime Hızlı ve Esnek Yanıt Verme",
+                r"(?:\*\*|__)?Your\s+Turn!.*": "",
+                r"(?:\*\*|__)?Prioritizing\s+Features(?:\*\*|__)?": "Özelliklerin Önceliklendirilmesi",
+                r"(?:\*\*|__)?Short\s+Iterations(?:\*\*|__)?": "Kısa İterasyonlar",
+                r"(?:\*\*|__)?Daily\s+Stand-up\s+Meetings(?:\*\*|__)?": "Günlük Ayakta Toplantılar",
+                r"(?:\*\*|__)?Early\s+and\s+Often\s+Feedback(?:\*\*|__)?": "Erken ve Sık Geri Bildirim",
+                r"(?:\*\*|__)?Visual\s+Management(?:\*\*|__)?": "Görsel Yönetim",
+                r"(?:\*\*|__)?Sustainable\s+Pace(?:\*\*|__)?": "Sürdürülebilir Hız",
+                r"(?:\*\*|__)?Yinelemeli\s+and\s+Artımlı(?:\*\*|__)?": "Yinelemeli ve Artımlı", # Fix specific grammar
+                r"\s+and\s+": " ve ", # General fix for " and " inside sentences
+                r"(?:\*\*|__)?Self-Organizing\s+Teams(?:\*\*|__)?": "Kendi Kendini Yöneten Takımlar",
+                r"(?:\*\*|__)?Agile\s+Methodologies(?:\*\*|__)?": "Agile Yöntemleri",
+                r"(?:\*\*|__)?Lean\s+Software\s+Development(?:\*\*|__)?": "Yalın Yazılım Geliştirme",
+                r"(?:\*\*|__)?Muhasebecilik(?:\*\*|__)?": "Yalın Yazılım Geliştirme", 
+                r"(?:\*\*|__)?Extreme\s+Programming\s*\(?XP\)?(?:\*\*|__)?": "Ekstrem Programlama (XP)",
+                r"(?:\*\*|__)?ürün_owner(?:\*\*|__)?": "Ürün Sahibi",
+                r"(?:\*\*|__)?Müşteri\s+Merkezi(?:\*\*|__)?": "Müşteri Odaklılık", 
+                r"(?:\*\*|__)?What\s+is\s+the\s+main\s+goal\s+of\s+Agile\s+methodology\??(?:\*\*|__)?": "Agile metodolojisinin temel amacı nedir?",
+                r"(?:\*\*|__)?Please\s+answer\s+in\s+Turkish.*": "",
+                r"(?:\*\*|__)?Please\s+respond\s+with.*": "", 
+                r"(?:\*\*|__)?Please\s+respond\s+in\s+Turkish.*": "",
+                r"(?:\*\*|__)?Remember\s+to\s+keep.*": "",
+                r"(?:\*\*|__)?Correct\s+answer:?": "Doğru Cevap:",
+                r"Ağaçlı": "Agile", 
+                r"Iteratif": "Yinelemeli", 
+                r"Incikti": "Artımlı", 
+                r"Flexibilite": "Esneklik", 
+                r"(?:\*\*|__)?Collaboration(?:\*\*|__)?": "İşbirliği", 
+                r"(?:\*\*|__)?Customer\s+Satisfaction(?:\*\*|__)?": "Müşteri Memnuniyeti", 
+                r"(?:\*\*|__)?Soru:[\s\n]*SORU:(?:\*\*|__)?": "**SORU:**", 
+                r"(?:\*\*|__)?processinin(?:\*\*|__)?": "sürecinin",
+                r"(?:\*\*|__)?deployment(?:\*\*|__)?": "dağıtım", 
+                r"(?:\*\*|__)?deploy\s+etmek(?:\*\*|__)?": "dağıtımını yapmak (deploy)", # Fix Plaza Turkish
+                r"(?:\*\*|__)?Nedir:\s+the\s+main\s+difference\s+between(?:\*\*|__)?": "Arasındaki temel fark nedir:",
+                r"(?:\*\*|__)?What\s+is\s+the\s+main\s+goal\s+of\s+Agile\s+methodology\??(?:\*\*|__)?": "Agile metodolojisinin temel amacı nedir?",
+                r"(?:\*\*|__)?Doğru\s+cevap:\s*['\"]?Monolithic\s+architecture\s+refers.*": "Doğru cevap: Monolitik mimari, uygulamanın tek bir birim olarak geliştirilmesidir.",
+                r"Now\s+it's\s+your\s+turn!.*": "", 
+                r"\(\s*$": "", # Remove trailing open parenthesis
+                r"\*\*QUIZ_EVAL": "**DEĞERLENDİRME:", 
+                r"correct=\"true\">": "", 
+            }
+            
+            # Sort by length descending to prevent partial matches (e.g. replacing 'Iterative' inside 'Iterative Development')
+            sorted_patterns = sorted(replacements.keys(), key=len, reverse=True)
+            
+            original_response_len = len(full_response)
+            for pattern in sorted_patterns:
+                full_response = re.sub(pattern, replacements[pattern], full_response, flags=re.IGNORECASE)
+                
+            logger.info(f"Chat Response Cleanup: Replaced English terms. Length changed from {original_response_len} to {len(full_response)}")
+        
+        except Exception as e:
+            full_response = f"⚠️ Üzgünüm, bir hata oluştu: {str(e)}"
+        
+        response = ChatTurnResponse(
+            mode=req.mode,
+            topic=req.topic,
+            level=req.level,
+            reply=full_response,
+            raw_model=mode_cfg.model,
+            session_id=req.session_id,
+            actions=actions,
+            suggestions=suggestions,
+        )
+
+        try:
+            log_action(
+                user_id=user_id,
+                action="CHAT_TURN_BOT",
+                entity_type="chat_message",
+                details={
+                    "mode": req.mode.value,
+                    "model": mode_cfg.model,
+                    "user_msg": req.message,
+                    "bot_reply": full_response[:100] + "..." if len(full_response) > 100 else full_response
+                }
+            )
+        except Exception:
+            pass
+
+        return response
+
     except Exception as e:
-        full_response = f"⚠️ Üzgünüm, bir hata oluştu: {str(e)}"
-    
-    return ChatTurnResponse(
-        mode=req.mode,
-        topic=req.topic,
-        level=req.level,
-        reply=full_response,
-        raw_model=mode_cfg.model,
-        session_id=req.session_id,
-    )
+        logger.error(f"Error in handle_heavy_turn: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
 
 async def _parse_and_log_chat_quiz(text: str, user_id: int, session_id: str):
     """

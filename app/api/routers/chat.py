@@ -168,7 +168,7 @@ async def chat_turn(
 
     # 1. Hızlı yanıt kontrolü (LLM bypass)
     try:
-        fast_resp = await handle_fast_turn(data)
+        fast_resp = await handle_fast_turn(data, user_id=user_id)
         if fast_resp:
             return fast_resp
     except Exception as e:

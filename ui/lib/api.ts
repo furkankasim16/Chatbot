@@ -20,13 +20,14 @@ export interface ChatModeConfig {
 
 export interface ChatTurnRequest {
   mode: string
-  topic?: string | null
-  level?: string | null
+  topic?: string
+  level?: string
   message: string
   history?: ChatMessage[]
-  session_id?: string | null
-  use_rag?: boolean
   language?: string // 🆕 Language
+  model?: string
+  use_rag?: boolean
+  session_id?: string
 }
 
 export interface ChatTurnResponse {

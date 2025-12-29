@@ -800,4 +800,30 @@ async def execute_chat_completion_with_retry(
         "latency_ms": latency,
         "latency_ms_total": latency,
     }
+
+    # [LOGGING] Add to DB
+    try:
+        from app.domain.repositories.llm_run_repo import add_llm_run
+        # Token counts not always available from chat endpoint but let's try
+        t_in = usage.get("prompt_eval_count") or usage.get("prompt_tokens") or usage.get("input_tokens")
+        t_out = usage.get("eval_count") or usage.get("completion_tokens") or usage.get("output_tokens")
+        
+        # Simple hash of last user message for uniqueness
+        p_hash = None
+        if messages:
+            last_msg = messages[-1].content
+            import hashlib
+            p_hash = hashlib.sha256(last_msg.encode()).hexdigest()
+
+        add_llm_run(
+            model_name=cfg.model,
+            prompt_hash=p_hash,
+            latency_ms=latency,
+            token_input=int(t_in) if t_in else None,
+            token_output=int(t_out) if t_out else None,
+            is_success=True
+        )
+    except Exception as e:
+        logger.error(f"Failed to log chat run: {e}")
+
     return {"content": content, "usage": final_usage}

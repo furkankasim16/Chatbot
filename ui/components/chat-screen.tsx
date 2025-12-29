@@ -94,6 +94,14 @@ export function ChatScreen({
     setLevel(defaultLevel)
   }, [defaultLevel])
 
+  /* ----------------------------------------------------------------------------------
+   *  NEW: Model Selection State
+   * ---------------------------------------------------------------------------------- */
+  const [selectedModel, setSelectedModel] = useState<string>("default")
+
+  // Auto-select Default if not set (optional)
+  // We can leave "default" -> Backend chooses based on settings.
+
   const handleSend = async () => {
     if (!input.trim()) return
     if (!modes[selectedMode]) return
@@ -112,8 +120,10 @@ export function ChatScreen({
         level,
         message: userMsg.content,
         history: messages,
-        language, // 🆕 Language
-        use_rag: useRag, // 🆕 Pass RAG flag
+        language,
+        use_rag: useRag,
+        // 🆕 Pass Selected Model (if not default)
+        model: selectedModel === "default" ? undefined : selectedModel,
       }
 
       let resp = await sendChatTurn(token, payload)
@@ -167,23 +177,6 @@ export function ChatScreen({
             </Button>
           )}
 
-          {/* 
-          <div>
-            <p className="text-xs font-semibold mb-1">Chat Modu</p>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(modes).map(([key, m]) => (
-                <button
-                  key={key}
-                  disabled
-                  className={`px-2 py-1 rounded border text-xs bg-muted opacity-50 cursor-not-allowed`}
-                >
-                  {m.title}
-                </button>
-              ))}
-            </div>
-          </div> 
-          */}
-
           <div>
             <p className="text-xs font-semibold mb-1">Konu</p>
             <Input
@@ -220,6 +213,25 @@ export function ChatScreen({
                 <SelectItem value="de">🇩🇪 Deutsch</SelectItem>
                 <SelectItem value="es">🇪🇸 Español</SelectItem>
                 <SelectItem value="fr">🇫🇷 Français</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* 🆕 Model Selector */}
+          <div className="pt-2 border-t border-border">
+            <p className="text-xs font-semibold mb-1">Yapay Zeka Modeli</p>
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-full h-8 text-xs">
+                <SelectValue placeholder="Varsayılan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Varsayılan (Default)</SelectItem>
+                <SelectItem value="gemini-2.0-flash">✨ Google Gemini 2.0</SelectItem>
+                <SelectItem value="llama-3.1-8b-instant">⚡ Groq Llama 3</SelectItem>
+                <SelectItem value="ollama:llama3:instruct">🦙 Ollama (Llama3)</SelectItem>
+                <SelectItem value="qwen2.5-14b">🤗 Qwen 2.5 14B</SelectItem>
+                <SelectItem value="ollama:phi3:medium">Phi-3 Medium</SelectItem>
+                <SelectItem value="mock">🧪 Mock (Test)</SelectItem>
               </SelectContent>
             </Select>
           </div>

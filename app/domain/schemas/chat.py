@@ -37,6 +37,7 @@ class ChatTurnRequest(BaseModel):
     topic: Optional[str] = None
     level: Optional[str] = None
     language: Optional[str] = "tr"
+    model: Optional[str] = None
     use_rag: bool = False
 
     # İstersen UI'den de geçmiş mesajları gönderebilirsin
